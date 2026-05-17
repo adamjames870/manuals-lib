@@ -70,6 +70,7 @@ def test_join_wrapped_lines_simple():
     """Test joining simple wrapped lines."""
     text = "This is a long line that has been\nwrapped to the next line"
     result = join_wrapped_lines(text)
+    # Both lines should be joined since neither is "special"
     assert result == "This is a long line that has been wrapped to the next line"
 
 

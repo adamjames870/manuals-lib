@@ -86,9 +86,9 @@ def is_special_line(line: str) -> bool:
     if stripped.endswith(('.', ':', ';', '!', '?')):
         return True
     
-    # Very short lines (likely labels or headings) - but not if they end with hyphen/comma
-    # which suggests continuation
-    if len(stripped) < 50 and not stripped.endswith(('-', ',')):
+    # Very short lines that look like headings/labels (< 30 chars)
+    # But not if they end with hyphen/comma which suggests continuation
+    if len(stripped) < 30 and not stripped.endswith(('-', ',')):
         return True
     
     return False
