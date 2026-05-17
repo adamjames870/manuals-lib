@@ -24,6 +24,20 @@ def get_output_path(pdf_path: Path, output_dir: Path) -> Path:
     return output_dir / f"{stem}.extracted.json"
 
 
+def get_report_path(pdf_path: Path, output_dir: Path) -> Path:
+    """Generate output path for extraction report.
+    
+    Args:
+        pdf_path: Path to the source PDF file
+        output_dir: Directory to write output files
+        
+    Returns:
+        Path to the output markdown report file
+    """
+    stem = pdf_path.stem
+    return output_dir / f"{stem}.report.md"
+
+
 def pdf_already_extracted(pdf_path: Path, output_dir: Path) -> bool:
     """Check if a PDF has already been extracted.
     
@@ -38,12 +52,62 @@ def pdf_already_extracted(pdf_path: Path, output_dir: Path) -> bool:
     return output_path.exists()
 
 
-def extract_to_json(pdf_path: Path, output_path: Path) -> None:
-    """Extract PDF content and write to JSON file.
+def generate_report(pdf_path: Path, pages: list, report_path: Path) -> None:
+    """Generate a markdown report with extraction statistics.
+    
+    Args:
+        pdf_path: Path to the source PDF file
+        pages: List of PageContent objects
+        report_path: Path to write the markdown report
+    """
+    # Calculate statistics
+    char_counts = [len(page.text) for page in pages]
+    total_chars = sum(char_counts)
+    empty_pages = [i + 1 for i, count in enumerate(char_counts) if count == 0]
+    short_pages = [i + 1 for i, count in enumerate(char_counts) if 0 < count < 100]
+    
+    # Generate markdown report
+    report = f"""# Extraction Report: {pdf_path.name}
+
+## Summary
+
+- **Source**: {pdf_path.name}
+- **Page Count**: {len(pages)}
+- **Total Characters**: {total_chars:,}
+- **Average Characters per Page**: {total_chars / len(pages):.0f}
+
+## Page Statistics
+
+| Page | Characters |
+|------|------------|
+"""
+    
+    for page_num, char_count in enumerate(char_counts, start=1):
+        report += f"| {page_num} | {char_count:,} |\n"
+    
+    # Add warnings section if there are issues
+    if empty_pages or short_pages:
+        report += "\n## Warnings\n\n"
+        
+        if empty_pages:
+            report += f"- **Empty Pages** ({len(empty_pages)}): {', '.join(map(str, empty_pages))}\n"
+        
+        if short_pages:
+            report += f"- **Suspiciously Short Pages** ({len(short_pages)}, <100 chars): {', '.join(map(str, short_pages))}\n"
+    
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write(report)
+
+
+def extract_to_json(pdf_path: Path, output_path: Path, report_path: Path) -> None:
+    """Extract PDF content and write to JSON file with report.
     
     Args:
         pdf_path: Path to the source PDF file
         output_path: Path to write the JSON output
+        report_path: Path to write the markdown report
     """
     pages = extract_pdf(pdf_path)
     
@@ -63,6 +127,8 @@ def extract_to_json(pdf_path: Path, output_path: Path) -> None:
     
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(output_data, f, indent=2, ensure_ascii=False)
+    
+    generate_report(pdf_path, pages, report_path)
 
 
 def main():
@@ -106,9 +172,11 @@ def main():
             
             try:
                 output_path = get_output_path(pdf_path, processed_dir)
-                extract_to_json(pdf_path, output_path)
+                report_path = get_report_path(pdf_path, processed_dir)
+                extract_to_json(pdf_path, output_path, report_path)
                 progress.update(task, description=f"[green]✓[/green] {pdf_path.name}")
                 console.print(f"  → {output_path}")
+                console.print(f"  → {report_path}")
             except Exception as e:
                 progress.update(task, description=f"[red]✗[/red] {pdf_path.name}")
                 console.print(f"  [red]Error:[/red] {e}")
