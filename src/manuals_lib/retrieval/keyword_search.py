@@ -56,8 +56,9 @@ def score_chunk(chunk_text: str, query: str) -> float:
     """Score a chunk based on keyword matches.
     
     Scoring strategy:
-    - Exact phrase match (case-insensitive): 10.0 points
+    - Exact phrase match (case-insensitive): 10.0 points per occurrence
     - Individual keyword matches: 1.0 point per occurrence
+    - Keywords within exact phrase matches are not double-counted
     
     Args:
         chunk_text: Text content of the chunk
@@ -72,20 +73,23 @@ def score_chunk(chunk_text: str, query: str) -> float:
     score = 0.0
     
     # Check for exact phrase match
+    phrase_count = 0
     if query_lower in chunk_lower:
         # Count occurrences of exact phrase
         phrase_count = chunk_lower.count(query_lower)
         score += phrase_count * 10.0
     
-    # Score individual keywords
-    # Split query into words (alphanumeric sequences)
-    keywords = re.findall(r'\w+', query_lower)
-    
-    for keyword in keywords:
-        if len(keyword) > 2:  # Skip very short words
-            # Count occurrences of this keyword
-            keyword_count = chunk_lower.count(keyword)
-            score += keyword_count * 1.0
+    # Score individual keywords only if no exact phrase match
+    # This ensures phrase matches score higher than keyword matches
+    if phrase_count == 0:
+        # Split query into words (alphanumeric sequences)
+        keywords = re.findall(r'\w+', query_lower)
+        
+        for keyword in keywords:
+            if len(keyword) > 2:  # Skip very short words
+                # Count occurrences of this keyword
+                keyword_count = chunk_lower.count(keyword)
+                score += keyword_count * 1.0
     
     return score
 
