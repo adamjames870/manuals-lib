@@ -33,7 +33,7 @@ class Embedder:
         Returns:
             Embedding dimension
         """
-        return self.model.get_sentence_embedding_dimension()
+        return self.model.get_embedding_dimension()
     
     def embed_texts(self, texts: list[str], batch_size: int = 32) -> np.ndarray:
         """Generate embeddings for a list of texts.
