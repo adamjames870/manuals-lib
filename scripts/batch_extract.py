@@ -162,10 +162,10 @@ def extract_to_json(
             {
                 "page_number": block.page_number,
                 "block_number": block.block_number,
-                "x0": block.bbox.x0,
-                "y0": block.bbox.y0,
-                "x1": block.bbox.x1,
-                "y1": block.bbox.y1,
+                "x0": round(block.bbox.x0, 2),
+                "y0": round(block.bbox.y0, 2),
+                "x1": round(block.bbox.x1, 2),
+                "y1": round(block.bbox.y1, 2),
                 "text": block.text,
             }
             for block in blocks
