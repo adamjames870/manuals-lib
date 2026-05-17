@@ -94,13 +94,19 @@ def pdf_already_extracted(pdf_path: Path, output_dir: Path) -> bool:
     return output_path.exists()
 
 
-def generate_report(pdf_path: Path, pages: list, report_path: Path) -> None:
+def generate_report(
+    pdf_path: Path,
+    pages: list,
+    report_path: Path,
+    chunks: list | None = None
+) -> None:
     """Generate a markdown report with extraction statistics.
     
     Args:
         pdf_path: Path to the source PDF file
         pages: List of PageContent objects
         report_path: Path to write the markdown report
+        chunks: Optional list of Chunk objects
     """
     # Calculate statistics
     char_counts = [len(page.text) for page in pages]
@@ -126,6 +132,51 @@ def generate_report(pdf_path: Path, pages: list, report_path: Path) -> None:
     
     for page_num, char_count in enumerate(char_counts, start=1):
         report += f"| {page_num} | {char_count:,} |\n"
+    
+    # Add chunk statistics if available
+    if chunks:
+        chunk_sizes = [chunk.char_count for chunk in chunks]
+        min_chunk = min(chunk_sizes)
+        max_chunk = max(chunk_sizes)
+        avg_chunk = sum(chunk_sizes) / len(chunk_sizes)
+        
+        # Count small and large chunks
+        small_chunks = [i for i, size in enumerate(chunk_sizes, 1) if size < 500]
+        large_chunks = [i for i, size in enumerate(chunk_sizes, 1) if size > 2000]
+        
+        # Count cross-page chunks
+        cross_page_chunks = [
+            i for i, chunk in enumerate(chunks, 1)
+            if chunk.page_end > chunk.page_start
+        ]
+        
+        # Estimate duplicate overlap
+        total_chunk_chars = sum(chunk_sizes)
+        total_page_chars = sum(char_counts)
+        overlap_estimate = total_chunk_chars - total_page_chars
+        overlap_pct = (overlap_estimate / total_page_chars * 100) if total_page_chars > 0 else 0
+        
+        report += "\n## Chunk Statistics\n\n"
+        report += f"- **Total Chunks**: {len(chunks)}\n"
+        report += f"- **Min Chunk Size**: {min_chunk:,} characters\n"
+        report += f"- **Max Chunk Size**: {max_chunk:,} characters\n"
+        report += f"- **Average Chunk Size**: {avg_chunk:.0f} characters\n"
+        report += f"- **Small Chunks** (<500 chars): {len(small_chunks)}\n"
+        report += f"- **Large Chunks** (>2000 chars): {len(large_chunks)}\n"
+        report += f"- **Cross-Page Chunks**: {len(cross_page_chunks)}\n"
+        report += f"- **Estimated Overlap**: {overlap_estimate:,} characters ({overlap_pct:.1f}%)\n"
+        
+        if small_chunks:
+            small_list = ', '.join(map(str, small_chunks[:10]))
+            if len(small_chunks) > 10:
+                small_list += f", ... ({len(small_chunks) - 10} more)"
+            report += f"\n  Small chunk IDs: {small_list}\n"
+        
+        if large_chunks:
+            large_list = ', '.join(map(str, large_chunks[:10]))
+            if len(large_chunks) > 10:
+                large_list += f", ... ({len(large_chunks) - 10} more)"
+            report += f"\n  Large chunk IDs: {large_list}\n"
     
     # Add warnings section if there are issues
     if empty_pages or short_pages:
@@ -188,8 +239,6 @@ def extract_to_json(
     
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(output_data, f, indent=2, ensure_ascii=False)
-    
-    generate_report(pdf_path, pages, report_path)
     
     # Extract and save blocks
     blocks = extract_pdf_blocks(pdf_path)
@@ -254,6 +303,15 @@ def extract_to_json(
             
             with open(chunks_path, "w", encoding="utf-8") as f:
                 json.dump(chunks_data, f, indent=2, ensure_ascii=False)
+            
+            # Generate report with chunk statistics
+            generate_report(pdf_path, pages, report_path, chunks)
+        else:
+            # Generate report without chunk statistics
+            generate_report(pdf_path, pages, report_path)
+    else:
+        # Generate report without normalization or chunking
+        generate_report(pdf_path, pages, report_path)
 
 
 def main():
