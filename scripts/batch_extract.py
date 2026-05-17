@@ -7,6 +7,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from manuals_lib.embeddings import build_index
 from manuals_lib.ingest import chunk_pages, extract_pdf, extract_pdf_blocks, normalize_pages
 
 
@@ -208,6 +209,7 @@ def extract_to_json(
     chunks_path: Path,
     skip_normalization: bool = False,
     skip_chunking: bool = False,
+    skip_embeddings: bool = False,
 ) -> None:
     """Extract PDF content and write to JSON file with report.
     
@@ -220,6 +222,7 @@ def extract_to_json(
         chunks_path: Path to write the chunks JSON output
         skip_normalization: Whether to skip normalization step
         skip_chunking: Whether to skip chunking step
+        skip_embeddings: Whether to skip embeddings generation
     """
     pages = extract_pdf(pdf_path)
     
@@ -304,6 +307,14 @@ def extract_to_json(
             with open(chunks_path, "w", encoding="utf-8") as f:
                 json.dump(chunks_data, f, indent=2, ensure_ascii=False)
             
+            # Build embeddings if not skipped
+            if not skip_embeddings:
+                index_dir = Path("data/index")
+                build_index(
+                    chunks_path=chunks_path,
+                    output_dir=index_dir,
+                )
+            
             # Generate report with chunk statistics
             generate_report(pdf_path, pages, report_path, chunks)
         else:
@@ -328,6 +339,11 @@ def main():
         "--skip-chunking",
         action="store_true",
         help="Skip text chunking step",
+    )
+    parser.add_argument(
+        "--skip-embeddings",
+        action="store_true",
+        help="Skip embeddings generation step",
     )
     args = parser.parse_args()
     
@@ -383,6 +399,7 @@ def main():
                     chunks_path,
                     skip_normalization=args.skip_normalization,
                     skip_chunking=args.skip_chunking,
+                    skip_embeddings=args.skip_embeddings,
                 )
                 progress.update(task, description=f"[green]✓[/green] {pdf_path.name}")
                 console.print(f"  → {output_path}")
@@ -392,6 +409,9 @@ def main():
                     console.print(f"  → {normalized_path}")
                     if not args.skip_chunking:
                         console.print(f"  → {chunks_path}")
+                        if not args.skip_embeddings:
+                            index_dir = Path("data/index") / pdf_path.stem
+                            console.print(f"  → {index_dir}/")
             except Exception as e:
                 progress.update(task, description=f"[red]✗[/red] {pdf_path.name}")
                 console.print(f"  [red]Error:[/red] {e}")
