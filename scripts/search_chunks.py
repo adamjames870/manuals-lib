@@ -154,9 +154,15 @@ def main():
     
     # Display search info
     if len(loaded_files) == 1:
-        console.print(f"\n[blue]Searching {len(all_chunks)} chunks from {loaded_files[0]} for:[/blue] {args.query}\n")
+        console.print(
+            f"\n[blue]Searching {len(all_chunks)} chunks from "
+            f"{loaded_files[0]} for:[/blue] {args.query}\n"
+        )
     else:
-        console.print(f"\n[blue]Searching {len(all_chunks)} chunks from {len(loaded_files)} files for:[/blue] {args.query}")
+        console.print(
+            f"\n[blue]Searching {len(all_chunks)} chunks from "
+            f"{len(loaded_files)} files for:[/blue] {args.query}"
+        )
         console.print(f"[dim]Files: {', '.join(loaded_files)}[/dim]\n")
     
     # Search
@@ -173,7 +179,10 @@ def main():
         page_range = format_page_range(match.page_start, match.page_end)
         
         # Format matched terms
-        match_type = "[green]Exact phrase[/green]" if match.exact_phrase_match else "[yellow]Keywords[/yellow]"
+        if match.exact_phrase_match:
+            match_type = "[green]Exact phrase[/green]"
+        else:
+            match_type = "[yellow]Keywords[/yellow]"
         matched_terms_str = ", ".join(f"'{term}'" for term in match.matched_terms)
         
         # Create header
