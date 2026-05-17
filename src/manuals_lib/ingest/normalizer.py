@@ -70,10 +70,6 @@ def is_special_line(line: str) -> bool:
     if not stripped:
         return True
     
-    # Very short lines (likely labels or headings)
-    if len(stripped) < 50 and not stripped.endswith(('-', ',')):
-        return True
-    
     # Bullet points
     if re.match(r'^[\u2022\u2023\u25E6\u2043\u2219•·○●\-\*]\s', stripped):
         return True
@@ -86,8 +82,13 @@ def is_special_line(line: str) -> bool:
     if '\t' in stripped or re.search(r'\s{3,}', stripped):
         return True
     
-    # Lines ending with punctuation that suggests completeness
+    # Lines ending with sentence-ending punctuation (complete thoughts)
     if stripped.endswith(('.', ':', ';', '!', '?')):
+        return True
+    
+    # Very short lines (likely labels or headings) - but not if they end with hyphen/comma
+    # which suggests continuation
+    if len(stripped) < 50 and not stripped.endswith(('-', ',')):
         return True
     
     return False
