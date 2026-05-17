@@ -1,11 +1,14 @@
 """PDF text extraction functionality."""
 
+import logging
 from pathlib import Path
 
 import pymupdf
 
 from manuals_lib.ingest.models import BoundingBox, PageContent, TextBlock
 from manuals_lib.ingest.ocr_extractor import extract_text_with_ocr, should_use_ocr
+
+logger = logging.getLogger(__name__)
 
 
 def extract_pdf(pdf_path: str | Path, use_ocr_fallback: bool = True) -> list[PageContent]:
@@ -32,15 +35,31 @@ def extract_pdf(pdf_path: str | Path, use_ocr_fallback: bool = True) -> list[Pag
     with pymupdf.open(pdf_path) as doc:
         for page_num, page in enumerate(doc, start=1):
             text = page.get_text()
+            original_text_len = len(text.strip())
             
             # If text extraction yields very little content and OCR fallback is enabled
             # assume it's a scanned page and use OCR
             if use_ocr_fallback and should_use_ocr(text):
+                logger.info(
+                    f"Page {page_num}: Low text content ({original_text_len} chars), "
+                    "attempting OCR"
+                )
                 try:
-                    text = extract_text_with_ocr(page)
-                except Exception:
+                    ocr_text = extract_text_with_ocr(page)
+                    if ocr_text and ocr_text.strip():
+                        text = ocr_text
+                        logger.info(
+                            f"Page {page_num}: OCR successful, extracted "
+                            f"{len(text.strip())} characters"
+                        )
+                    else:
+                        logger.warning(
+                            f"Page {page_num}: OCR returned empty text, "
+                            "keeping original extraction"
+                        )
+                except Exception as e:
+                    logger.error(f"Page {page_num}: OCR failed: {e}")
                     # If OCR fails, fall back to whatever text we got
-                    pass
             
             pages.append(
                 PageContent(
@@ -84,9 +103,13 @@ def extract_pdf_blocks(pdf_path: str | Path, use_ocr_fallback: bool = True) -> l
             
             # If OCR fallback is enabled and page has little text, use OCR
             if use_ocr_fallback and should_use_ocr(total_text):
+                logger.info(
+                    f"Page {page_num}: Low block text content "
+                    f"({len(total_text.strip())} chars), attempting OCR"
+                )
                 try:
                     ocr_text = extract_text_with_ocr(page)
-                    if ocr_text.strip():
+                    if ocr_text and ocr_text.strip():
                         # Create a single block for OCR text spanning the whole page
                         rect = page.rect
                         blocks.append(
@@ -100,10 +123,19 @@ def extract_pdf_blocks(pdf_path: str | Path, use_ocr_fallback: bool = True) -> l
                                 text=ocr_text.strip(),
                             )
                         )
+                        logger.info(
+                            f"Page {page_num}: OCR successful, extracted "
+                            f"{len(ocr_text.strip())} characters"
+                        )
                         continue
-                except Exception:
+                    else:
+                        logger.warning(
+                            f"Page {page_num}: OCR returned empty text, "
+                            "falling back to regular block extraction"
+                        )
+                except Exception as e:
+                    logger.error(f"Page {page_num}: OCR failed: {e}")
                     # If OCR fails, fall back to regular block extraction
-                    pass
             
             # Regular block extraction
             for block_num, block in enumerate(page_blocks):
