@@ -2,6 +2,7 @@
 """Search chunks using keyword matching."""
 
 import argparse
+from pathlib import Path
 
 from rich.console import Console
 from rich.panel import Panel
@@ -90,8 +91,7 @@ def main():
     )
     parser.add_argument(
         "--chunks",
-        required=True,
-        help="Path to chunks JSON file",
+        help="Path to chunks JSON file (if not specified, searches all files in data/processed/)",
     )
     parser.add_argument(
         "--query",
@@ -113,24 +113,54 @@ def main():
     args = parser.parse_args()
     console = Console()
     
-    # Load chunks
-    try:
-        chunks = load_chunks_from_json(args.chunks)
-    except FileNotFoundError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        return 1
-    except Exception as e:
-        console.print(f"[red]Error loading chunks:[/red] {e}")
-        return 1
+    # Determine which chunks files to load
+    if args.chunks:
+        # Load specific file
+        chunks_files = [Path(args.chunks)]
+    else:
+        # Find all chunks files in data/processed/
+        processed_dir = Path("data/processed")
+        if not processed_dir.exists():
+            console.print(f"[red]Error:[/red] Directory not found: {processed_dir}")
+            console.print("[yellow]Hint:[/yellow] Run batch_extract.py first to process PDFs")
+            return 1
+        
+        chunks_files = list(processed_dir.glob("*.chunks.json"))
+        
+        if not chunks_files:
+            console.print(f"[yellow]No .chunks.json files found in {processed_dir}[/yellow]")
+            console.print("[yellow]Hint:[/yellow] Run batch_extract.py first to process PDFs")
+            return 0
     
-    if not chunks:
-        console.print("[yellow]No chunks found in file[/yellow]")
+    # Load chunks from all files
+    all_chunks = []
+    loaded_files = []
+    
+    for chunks_file in chunks_files:
+        try:
+            file_chunks = load_chunks_from_json(chunks_file)
+            all_chunks.extend(file_chunks)
+            loaded_files.append(chunks_file.name)
+        except FileNotFoundError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            return 1
+        except Exception as e:
+            console.print(f"[red]Error loading {chunks_file}:[/red] {e}")
+            return 1
+    
+    if not all_chunks:
+        console.print("[yellow]No chunks found[/yellow]")
         return 0
     
-    # Search
-    console.print(f"\n[blue]Searching {len(chunks)} chunks for:[/blue] {args.query}\n")
+    # Display search info
+    if len(loaded_files) == 1:
+        console.print(f"\n[blue]Searching {len(all_chunks)} chunks from {loaded_files[0]} for:[/blue] {args.query}\n")
+    else:
+        console.print(f"\n[blue]Searching {len(all_chunks)} chunks from {len(loaded_files)} files for:[/blue] {args.query}")
+        console.print(f"[dim]Files: {', '.join(loaded_files)}[/dim]\n")
     
-    matches = search_chunks(chunks, args.query, args.top_k)
+    # Search
+    matches = search_chunks(all_chunks, args.query, args.top_k)
     
     if not matches:
         console.print("[yellow]No matches found[/yellow]")

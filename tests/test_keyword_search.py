@@ -402,3 +402,42 @@ def test_search_chunks_first_match_position():
     assert len(matches) == 1
     assert matches[0].first_match_pos > 0
     assert "python" in matches[0].text[matches[0].first_match_pos:].lower()
+
+
+def test_search_chunks_multiple_sources():
+    """Test searching across chunks from multiple source documents."""
+    chunks = [
+        {
+            "chunk_id": "manual1_chunk_0001",
+            "source": "manual1.pdf",
+            "page_start": 1,
+            "page_end": 1,
+            "text": "Python programming basics for beginners.",
+            "char_count": 40,
+        },
+        {
+            "chunk_id": "manual2_chunk_0001",
+            "source": "manual2.pdf",
+            "page_start": 1,
+            "page_end": 1,
+            "text": "Advanced Python programming techniques.",
+            "char_count": 39,
+        },
+        {
+            "chunk_id": "manual3_chunk_0001",
+            "source": "manual3.pdf",
+            "page_start": 1,
+            "page_end": 1,
+            "text": "Java programming guide.",
+            "char_count": 23,
+        },
+    ]
+    
+    matches = search_chunks(chunks, "Python programming", top_k=5)
+    
+    # Should find both Python chunks
+    assert len(matches) == 2
+    assert matches[0].source in ["manual1.pdf", "manual2.pdf"]
+    assert matches[1].source in ["manual1.pdf", "manual2.pdf"]
+    # Should not include Java chunk
+    assert all(m.source != "manual3.pdf" for m in matches)
