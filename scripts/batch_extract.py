@@ -7,7 +7,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from manuals_lib.ingest import extract_pdf, extract_pdf_blocks
+from manuals_lib.ingest import extract_pdf, extract_pdf_blocks, normalize_pages
 
 
 def get_output_path(pdf_path: Path, output_dir: Path) -> Path:
@@ -50,6 +50,20 @@ def get_blocks_path(pdf_path: Path, output_dir: Path) -> Path:
     """
     stem = pdf_path.stem
     return output_dir / f"{stem}.blocks.json"
+
+
+def get_normalized_path(pdf_path: Path, output_dir: Path) -> Path:
+    """Generate output path for normalized JSON file.
+    
+    Args:
+        pdf_path: Path to the source PDF file
+        output_dir: Directory to write output files
+        
+    Returns:
+        Path to the output normalized JSON file
+    """
+    stem = pdf_path.stem
+    return output_dir / f"{stem}.normalized.json"
 
 
 def pdf_already_extracted(pdf_path: Path, output_dir: Path) -> bool:
@@ -121,7 +135,12 @@ def generate_report(pdf_path: Path, pages: list, report_path: Path) -> None:
 
 
 def extract_to_json(
-    pdf_path: Path, output_path: Path, report_path: Path, blocks_path: Path
+    pdf_path: Path,
+    output_path: Path,
+    report_path: Path,
+    blocks_path: Path,
+    normalized_path: Path,
+    skip_normalization: bool = False,
 ) -> None:
     """Extract PDF content and write to JSON file with report.
     
@@ -130,6 +149,8 @@ def extract_to_json(
         output_path: Path to write the JSON output
         report_path: Path to write the markdown report
         blocks_path: Path to write the blocks JSON output
+        normalized_path: Path to write the normalized JSON output
+        skip_normalization: Whether to skip normalization step
     """
     pages = extract_pdf(pdf_path)
     
@@ -174,10 +195,39 @@ def extract_to_json(
     
     with open(blocks_path, "w", encoding="utf-8") as f:
         json.dump(blocks_data, f, indent=2, ensure_ascii=False)
+    
+    # Normalize and save normalized content
+    if not skip_normalization:
+        normalized_pages = normalize_pages(pages, join_wrapped=True)
+        
+        normalized_data = {
+            "source": pdf_path.name,
+            "page_count": len(normalized_pages),
+            "pages": [
+                {
+                    "page_number": page.page_number,
+                    "text": page.text,
+                }
+                for page in normalized_pages
+            ],
+        }
+        
+        with open(normalized_path, "w", encoding="utf-8") as f:
+            json.dump(normalized_data, f, indent=2, ensure_ascii=False)
 
 
 def main():
     """Process all PDFs in data/raw/ and extract to data/processed/."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Batch extract PDFs to JSON")
+    parser.add_argument(
+        "--skip-normalization",
+        action="store_true",
+        help="Skip text normalization step",
+    )
+    args = parser.parse_args()
+    
     console = Console()
     
     raw_dir = Path("data/raw")
@@ -219,11 +269,21 @@ def main():
                 output_path = get_output_path(pdf_path, processed_dir)
                 report_path = get_report_path(pdf_path, processed_dir)
                 blocks_path = get_blocks_path(pdf_path, processed_dir)
-                extract_to_json(pdf_path, output_path, report_path, blocks_path)
+                normalized_path = get_normalized_path(pdf_path, processed_dir)
+                extract_to_json(
+                    pdf_path,
+                    output_path,
+                    report_path,
+                    blocks_path,
+                    normalized_path,
+                    skip_normalization=args.skip_normalization,
+                )
                 progress.update(task, description=f"[green]✓[/green] {pdf_path.name}")
                 console.print(f"  → {output_path}")
                 console.print(f"  → {report_path}")
                 console.print(f"  → {blocks_path}")
+                if not args.skip_normalization:
+                    console.print(f"  → {normalized_path}")
             except Exception as e:
                 progress.update(task, description=f"[red]✗[/red] {pdf_path.name}")
                 console.print(f"  [red]Error:[/red] {e}")
