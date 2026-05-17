@@ -1,9 +1,8 @@
 """OCR-based text extraction for scanned documents."""
 
+import pymupdf
 import pytesseract
 from PIL import Image
-
-import pymupdf
 
 
 def extract_text_with_ocr(page: pymupdf.Page, dpi: int = 300) -> str:
