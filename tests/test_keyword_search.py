@@ -238,6 +238,9 @@ def test_chunk_match_dataclass():
         text="Test content",
         score=15.5,
         char_count=12,
+        matched_terms=["test"],
+        exact_phrase_match=False,
+        first_match_pos=0,
     )
     
     assert match.chunk_id == "test_chunk_0001"
@@ -247,3 +250,152 @@ def test_chunk_match_dataclass():
     assert match.text == "Test content"
     assert match.score == 15.5
     assert match.char_count == 12
+    assert match.matched_terms == ["test"]
+    assert match.exact_phrase_match is False
+    assert match.first_match_pos == 0
+
+
+def test_score_chunk_position_bonus():
+    """Test that matches near the start score higher."""
+    # Match at the beginning
+    early_text = "Python programming is great. " + "Other content. " * 50
+    early_score, _, _, _ = score_chunk(early_text, "Python programming")
+    
+    # Match later in the text
+    late_text = "Other content. " * 50 + "Python programming is great."
+    late_score, _, _, _ = score_chunk(late_text, "Python programming")
+    
+    # Early match should score higher
+    assert early_score > late_score
+
+
+def test_is_front_matter_toc():
+    """Test detection of table of contents."""
+    from manuals_lib.retrieval.keyword_search import is_front_matter
+    
+    toc_text = """Table of Contents
+    
+    Chapter 1: Introduction .................. 1
+    Chapter 2: Getting Started ............... 15
+    Chapter 3: Advanced Topics ............... 42
+    Chapter 4: Conclusion .................... 89
+    """
+    
+    assert is_front_matter(toc_text) is True
+
+
+def test_is_front_matter_regular_content():
+    """Test that regular content is not detected as front matter."""
+    from manuals_lib.retrieval.keyword_search import is_front_matter
+    
+    regular_text = """This is a detailed explanation of Python programming.
+    
+    Python is a high-level programming language that emphasizes code readability.
+    It supports multiple programming paradigms including procedural, object-oriented,
+    and functional programming. Python's design philosophy emphasizes code readability
+    with its notable use of significant whitespace.
+    """
+    
+    assert is_front_matter(regular_text) is False
+
+
+def test_search_chunks_content_beats_toc():
+    """Test that relevant content ranks higher than table of contents."""
+    chunks = [
+        {
+            "chunk_id": "manual_chunk_0001",
+            "source": "manual.pdf",
+            "page_start": 1,
+            "page_end": 1,
+            "text": """Table of Contents
+            
+            Chapter 1: Python Basics ................ 5
+            Chapter 2: Python Functions ............. 20
+            Chapter 3: Python Classes ............... 45
+            Chapter 4: Python Modules ............... 78
+            """,
+            "char_count": 200,
+        },
+        {
+            "chunk_id": "manual_chunk_0005",
+            "source": "manual.pdf",
+            "page_start": 5,
+            "page_end": 5,
+            "text": """Python Basics
+            
+            Python is a high-level programming language. To start programming in Python,
+            you need to understand variables, data types, and control structures. Python
+            uses indentation to define code blocks, making it very readable. Python supports
+            multiple programming paradigms and has a rich standard library.
+            """,
+            "char_count": 300,
+        },
+    ]
+    
+    matches = search_chunks(chunks, "Python programming", top_k=5)
+    
+    # Content chunk should rank higher than TOC
+    assert len(matches) == 2
+    assert matches[0].chunk_id == "manual_chunk_0005"
+    assert matches[0].score > matches[1].score
+
+
+def test_search_chunks_exact_phrase_metadata():
+    """Test that exact phrase match is properly recorded."""
+    chunks = [
+        {
+            "chunk_id": "test_chunk_0001",
+            "source": "test.pdf",
+            "page_start": 1,
+            "page_end": 1,
+            "text": "This document covers Python programming in detail.",
+            "char_count": 50,
+        },
+    ]
+    
+    matches = search_chunks(chunks, "Python programming", top_k=5)
+    
+    assert len(matches) == 1
+    assert matches[0].exact_phrase_match is True
+    assert "Python programming" in matches[0].matched_terms
+
+
+def test_search_chunks_keyword_metadata():
+    """Test that keyword matches are properly recorded."""
+    chunks = [
+        {
+            "chunk_id": "test_chunk_0001",
+            "source": "test.pdf",
+            "page_start": 1,
+            "page_end": 1,
+            "text": "Python is great. Programming is fun.",
+            "char_count": 36,
+        },
+    ]
+    
+    matches = search_chunks(chunks, "Python programming", top_k=5)
+    
+    assert len(matches) == 1
+    assert matches[0].exact_phrase_match is False
+    assert "python" in matches[0].matched_terms
+    assert "programming" in matches[0].matched_terms
+
+
+def test_search_chunks_first_match_position():
+    """Test that first match position is recorded."""
+    chunks = [
+        {
+            "chunk_id": "test_chunk_0001",
+            "source": "test.pdf",
+            "page_start": 1,
+            "page_end": 1,
+            "text": "Some introductory text. Python programming is discussed here.",
+            "char_count": 61,
+        },
+    ]
+    
+    matches = search_chunks(chunks, "Python", top_k=5)
+    
+    assert len(matches) == 1
+    assert matches[0].first_match_pos > 0
+    assert "python" in matches[0].text[matches[0].first_match_pos:].lower()

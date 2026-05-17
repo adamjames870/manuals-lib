@@ -24,11 +24,12 @@ def format_page_range(page_start: int, page_end: int) -> str:
     return f"Pages {page_start}-{page_end}"
 
 
-def get_preview(text: str, max_length: int = 200) -> str:
-    """Get a preview of chunk text.
+def get_preview(text: str, first_match_pos: int = -1, max_length: int = 300) -> str:
+    """Get a preview of chunk text centered around the first match.
     
     Args:
         text: Full chunk text
+        first_match_pos: Position of first match (-1 if unknown)
         max_length: Maximum preview length
         
     Returns:
@@ -37,7 +38,36 @@ def get_preview(text: str, max_length: int = 200) -> str:
     if len(text) <= max_length:
         return text
     
-    # Try to break at a sentence or word boundary
+    # If we know where the match is, center preview around it
+    if first_match_pos >= 0:
+        # Try to center the preview around the match
+        start = max(0, first_match_pos - max_length // 3)
+        end = min(len(text), start + max_length)
+        
+        # Adjust start if we're at the end
+        if end == len(text):
+            start = max(0, end - max_length)
+        
+        preview = text[start:end]
+        
+        # Add ellipsis if truncated
+        prefix = "..." if start > 0 else ""
+        suffix = "..." if end < len(text) else ""
+        
+        # Try to break at word boundaries
+        if prefix:
+            first_space = preview.find(' ')
+            if first_space > 0 and first_space < 50:
+                preview = preview[first_space + 1:]
+        
+        if suffix:
+            last_space = preview.rfind(' ')
+            if last_space > len(preview) - 50:
+                preview = preview[:last_space]
+        
+        return prefix + preview + suffix
+    
+    # Fall back to start of text
     preview = text[:max_length]
     
     # Look for last sentence boundary
@@ -112,6 +142,10 @@ def main():
     for i, match in enumerate(matches, 1):
         page_range = format_page_range(match.page_start, match.page_end)
         
+        # Format matched terms
+        match_type = "[green]Exact phrase[/green]" if match.exact_phrase_match else "[yellow]Keywords[/yellow]"
+        matched_terms_str = ", ".join(f"'{term}'" for term in match.matched_terms)
+        
         # Create header
         header = (
             f"[bold]#{i}[/bold] "
@@ -120,17 +154,22 @@ def main():
             f"[yellow]Score: {match.score:.1f}[/yellow]"
         )
         
+        # Create subtitle with match info
+        subtitle = f"{match_type} | Matched: {matched_terms_str}"
+        
         # Get text to display
         if args.full:
             display_text = match.text
         else:
-            display_text = get_preview(match.text)
+            display_text = get_preview(match.text, match.first_match_pos)
         
         # Create panel with chunk content
         panel = Panel(
             display_text,
             title=header,
+            subtitle=subtitle,
             title_align="left",
+            subtitle_align="left",
             border_style="blue",
         )
         
