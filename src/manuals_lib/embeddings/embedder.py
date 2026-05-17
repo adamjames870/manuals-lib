@@ -17,14 +17,21 @@ class Embedder:
         model_name: Name of the model
     """
     
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2", local_files_only: bool = False):
         """Initialize embedder with a sentence-transformers model.
         
         Args:
             model_name: Name of the sentence-transformers model to use
+            local_files_only: If True, only use cached models without checking HF Hub
         """
         self.model_name = model_name
-        self.model = SentenceTransformer(model_name)
+        try:
+            self.model = SentenceTransformer(model_name, local_files_only=local_files_only)
+        except OSError:
+            # Model not cached, download it first
+            if local_files_only:
+                raise
+            self.model = SentenceTransformer(model_name, local_files_only=False)
     
     @property
     def embedding_dim(self) -> int:
