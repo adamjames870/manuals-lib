@@ -2,11 +2,9 @@
 """Search chunks using keyword matching."""
 
 import argparse
-from pathlib import Path
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.syntax import Syntax
 
 from manuals_lib.retrieval import load_chunks_from_json, search_chunks
 

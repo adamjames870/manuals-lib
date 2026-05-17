@@ -1,7 +1,6 @@
 """Tests for keyword search retrieval."""
 
 import json
-from pathlib import Path
 
 import pytest
 
