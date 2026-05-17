@@ -68,9 +68,9 @@ def test_is_special_line_normal():
 
 def test_join_wrapped_lines_simple():
     """Test joining simple wrapped lines."""
-    text = "This is a long line that has been\nwrapped to the next line."
+    text = "This is a long line that has been\nwrapped to the next line"
     result = join_wrapped_lines(text)
-    assert result == "This is a long line that has been wrapped to the next line."
+    assert result == "This is a long line that has been wrapped to the next line"
 
 
 def test_join_wrapped_lines_preserves_bullets():

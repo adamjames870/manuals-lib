@@ -102,7 +102,7 @@ def generate_layout_report(pdf_path: Path, blocks: list, analysis: dict) -> str:
     
     # Short blocks section
     if analysis['short_blocks']:
-        report += f"\n## Short Blocks (<50 characters)\n\n"
+        report += "\n## Short Blocks (<50 characters)\n\n"
         report += f"Found {len(analysis['short_blocks'])} short blocks:\n\n"
         report += "| Page | Block | Length |\n"
         report += "|------|-------|--------|\n"
@@ -113,7 +113,7 @@ def generate_layout_report(pdf_path: Path, blocks: list, analysis: dict) -> str:
     
     # Repeated text section
     if analysis['repeated_texts']:
-        report += f"\n## Repeated Text Across Pages\n\n"
+        report += "\n## Repeated Text Across Pages\n\n"
         report += f"Found {len(analysis['repeated_texts'])} repeated text patterns:\n\n"
         report += "| Text (first 50 chars) | Occurrences |\n"
         report += "|----------------------|-------------|\n"
@@ -125,7 +125,7 @@ def generate_layout_report(pdf_path: Path, blocks: list, analysis: dict) -> str:
     
     # Headers/footers section
     if analysis['potential_headers']:
-        report += f"\n## Potential Headers\n\n"
+        report += "\n## Potential Headers\n\n"
         report += "| Text (first 50 chars) | Occurrences | Avg Y Position |\n"
         report += "|----------------------|-------------|----------------|\n"
         for text, count, avg_y in analysis['potential_headers'][:5]:
@@ -133,7 +133,7 @@ def generate_layout_report(pdf_path: Path, blocks: list, analysis: dict) -> str:
             report += f"| {text_preview} | {count} | {avg_y:.1f} |\n"
     
     if analysis['potential_footers']:
-        report += f"\n## Potential Footers\n\n"
+        report += "\n## Potential Footers\n\n"
         report += "| Text (first 50 chars) | Occurrences | Avg Y Position |\n"
         report += "|----------------------|-------------|----------------|\n"
         for text, count, avg_y in analysis['potential_footers'][:5]:
