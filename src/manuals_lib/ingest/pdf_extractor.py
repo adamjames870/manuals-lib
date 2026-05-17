@@ -3,31 +3,9 @@
 from pathlib import Path
 
 import pymupdf
-import pytesseract
-from PIL import Image
 
 from manuals_lib.ingest.models import BoundingBox, PageContent, TextBlock
-
-
-def _extract_text_with_ocr(page: pymupdf.Page) -> str:
-    """Extract text from a page using OCR.
-    
-    Args:
-        page: PyMuPDF page object
-        
-    Returns:
-        Extracted text from OCR
-    """
-    # Render page to image at 300 DPI for better OCR quality
-    pix = page.get_pixmap(matrix=pymupdf.Matrix(300/72, 300/72))
-    
-    # Convert to PIL Image
-    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-    
-    # Run OCR
-    text = pytesseract.image_to_string(img)
-    
-    return text
+from manuals_lib.ingest.ocr_extractor import extract_text_with_ocr, should_use_ocr
 
 
 def extract_pdf(pdf_path: str | Path, use_ocr_fallback: bool = True) -> list[PageContent]:
@@ -57,9 +35,9 @@ def extract_pdf(pdf_path: str | Path, use_ocr_fallback: bool = True) -> list[Pag
             
             # If text extraction yields very little content and OCR fallback is enabled
             # assume it's a scanned page and use OCR
-            if use_ocr_fallback and len(text.strip()) < 50:
+            if use_ocr_fallback and should_use_ocr(text):
                 try:
-                    text = _extract_text_with_ocr(page)
+                    text = extract_text_with_ocr(page)
                 except Exception:
                     # If OCR fails, fall back to whatever text we got
                     pass
@@ -105,9 +83,9 @@ def extract_pdf_blocks(pdf_path: str | Path, use_ocr_fallback: bool = True) -> l
             total_text = ''.join(block[4] for block in page_blocks if len(block) > 4)
             
             # If OCR fallback is enabled and page has little text, use OCR
-            if use_ocr_fallback and len(total_text.strip()) < 50:
+            if use_ocr_fallback and should_use_ocr(total_text):
                 try:
-                    ocr_text = _extract_text_with_ocr(page)
+                    ocr_text = extract_text_with_ocr(page)
                     if ocr_text.strip():
                         # Create a single block for OCR text spanning the whole page
                         rect = page.rect
