@@ -211,3 +211,107 @@ def cosine_similarity_matrix(
     similarities = np.dot(embeddings_norm, query_norm)
     
     return similarities
+
+
+def load_index(index_dir: Path) -> tuple[IndexManifest, list[ChunkMetadata], np.ndarray]:
+    """Load an embedding index from disk.
+    
+    Args:
+        index_dir: Directory containing manifest.json, chunks.json, and embeddings.npy
+        
+    Returns:
+        Tuple of (manifest, chunk_metadata, embeddings)
+        
+    Raises:
+        FileNotFoundError: If required files are missing
+        json.JSONDecodeError: If JSON files are invalid
+    """
+    manifest_path = index_dir / "manifest.json"
+    chunks_path = index_dir / "chunks.json"
+    embeddings_path = index_dir / "embeddings.npy"
+    
+    # Check all files exist
+    if not manifest_path.exists():
+        raise FileNotFoundError(f"Manifest not found: {manifest_path}")
+    if not chunks_path.exists():
+        raise FileNotFoundError(f"Chunks not found: {chunks_path}")
+    if not embeddings_path.exists():
+        raise FileNotFoundError(f"Embeddings not found: {embeddings_path}")
+    
+    # Load manifest
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest_data = json.load(f)
+    manifest = IndexManifest(
+        model_name=manifest_data["model_name"],
+        embedding_dim=manifest_data["embedding_dim"],
+        chunk_count=manifest_data["chunk_count"],
+        source_file=manifest_data["source_file"],
+        created_at=manifest_data["created_at"],
+    )
+    
+    # Load chunks
+    with open(chunks_path, "r", encoding="utf-8") as f:
+        chunks_data = json.load(f)
+    chunk_metadata = [
+        ChunkMetadata(
+            row_index=chunk["row_index"],
+            chunk_id=chunk["chunk_id"],
+            source=chunk["source"],
+            page_start=chunk["page_start"],
+            page_end=chunk["page_end"],
+            text=chunk["text"],
+        )
+        for chunk in chunks_data["chunks"]
+    ]
+    
+    # Load embeddings
+    embeddings = np.load(embeddings_path)
+    
+    return manifest, chunk_metadata, embeddings
+
+
+def semantic_search(
+    query: str,
+    index_dir: Path,
+    top_k: int = 5,
+) -> list[tuple[int, float, ChunkMetadata]]:
+    """Perform semantic search over an embedding index.
+    
+    Args:
+        query: Search query text
+        index_dir: Directory containing the embedding index
+        top_k: Number of top results to return
+        
+    Returns:
+        List of (rank, similarity_score, chunk_metadata) tuples, sorted by similarity
+        
+    Raises:
+        FileNotFoundError: If index files are missing
+        ValueError: If top_k is invalid
+    """
+    if top_k < 1:
+        raise ValueError(f"top_k must be >= 1, got {top_k}")
+    
+    # Load index
+    manifest, chunk_metadata, embeddings = load_index(index_dir)
+    
+    # Initialize embedder with same model as index
+    embedder = Embedder(manifest.model_name)
+    
+    # Embed query
+    query_embedding = embedder.embed_texts([query])[0]
+    
+    # Compute similarities
+    similarities = cosine_similarity_matrix(query_embedding, embeddings)
+    
+    # Get top-k indices
+    top_indices = np.argsort(similarities)[::-1][:top_k]
+    
+    # Build results
+    results = []
+    for rank, idx in enumerate(top_indices, start=1):
+        similarity = float(similarities[idx])
+        chunk = chunk_metadata[idx]
+        results.append((rank, similarity, chunk))
+    
+    return results
