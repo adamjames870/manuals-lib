@@ -7,7 +7,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from manuals_lib.ingest import extract_pdf, extract_pdf_blocks, normalize_pages
+from manuals_lib.ingest import chunk_pages, extract_pdf, extract_pdf_blocks, normalize_pages
 
 
 def get_output_path(pdf_path: Path, output_dir: Path) -> Path:
@@ -64,6 +64,20 @@ def get_normalized_path(pdf_path: Path, output_dir: Path) -> Path:
     """
     stem = pdf_path.stem
     return output_dir / f"{stem}.normalized.json"
+
+
+def get_chunks_path(pdf_path: Path, output_dir: Path) -> Path:
+    """Generate output path for chunks JSON file.
+    
+    Args:
+        pdf_path: Path to the source PDF file
+        output_dir: Directory to write output files
+        
+    Returns:
+        Path to the output chunks JSON file
+    """
+    stem = pdf_path.stem
+    return output_dir / f"{stem}.chunks.json"
 
 
 def pdf_already_extracted(pdf_path: Path, output_dir: Path) -> bool:
@@ -140,7 +154,9 @@ def extract_to_json(
     report_path: Path,
     blocks_path: Path,
     normalized_path: Path,
+    chunks_path: Path,
     skip_normalization: bool = False,
+    skip_chunking: bool = False,
 ) -> None:
     """Extract PDF content and write to JSON file with report.
     
@@ -150,7 +166,9 @@ def extract_to_json(
         report_path: Path to write the markdown report
         blocks_path: Path to write the blocks JSON output
         normalized_path: Path to write the normalized JSON output
+        chunks_path: Path to write the chunks JSON output
         skip_normalization: Whether to skip normalization step
+        skip_chunking: Whether to skip chunking step
     """
     pages = extract_pdf(pdf_path)
     
@@ -214,6 +232,28 @@ def extract_to_json(
         
         with open(normalized_path, "w", encoding="utf-8") as f:
             json.dump(normalized_data, f, indent=2, ensure_ascii=False)
+        
+        # Chunk and save chunks
+        if not skip_chunking:
+            chunks = chunk_pages(normalized_pages)
+            
+            chunks_data = {
+                "source": pdf_path.name,
+                "total_chunks": len(chunks),
+                "chunks": [
+                    {
+                        "chunk_id": chunk.chunk_id,
+                        "page_start": chunk.page_start,
+                        "page_end": chunk.page_end,
+                        "char_count": chunk.char_count,
+                        "text": chunk.text,
+                    }
+                    for chunk in chunks
+                ],
+            }
+            
+            with open(chunks_path, "w", encoding="utf-8") as f:
+                json.dump(chunks_data, f, indent=2, ensure_ascii=False)
 
 
 def main():
@@ -225,6 +265,11 @@ def main():
         "--skip-normalization",
         action="store_true",
         help="Skip text normalization step",
+    )
+    parser.add_argument(
+        "--skip-chunking",
+        action="store_true",
+        help="Skip text chunking step",
     )
     args = parser.parse_args()
     
@@ -270,13 +315,16 @@ def main():
                 report_path = get_report_path(pdf_path, processed_dir)
                 blocks_path = get_blocks_path(pdf_path, processed_dir)
                 normalized_path = get_normalized_path(pdf_path, processed_dir)
+                chunks_path = get_chunks_path(pdf_path, processed_dir)
                 extract_to_json(
                     pdf_path,
                     output_path,
                     report_path,
                     blocks_path,
                     normalized_path,
+                    chunks_path,
                     skip_normalization=args.skip_normalization,
+                    skip_chunking=args.skip_chunking,
                 )
                 progress.update(task, description=f"[green]✓[/green] {pdf_path.name}")
                 console.print(f"  → {output_path}")
@@ -284,6 +332,8 @@ def main():
                 console.print(f"  → {blocks_path}")
                 if not args.skip_normalization:
                     console.print(f"  → {normalized_path}")
+                    if not args.skip_chunking:
+                        console.print(f"  → {chunks_path}")
             except Exception as e:
                 progress.update(task, description=f"[red]✗[/red] {pdf_path.name}")
                 console.print(f"  [red]Error:[/red] {e}")

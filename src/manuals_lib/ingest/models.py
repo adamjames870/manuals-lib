@@ -49,3 +49,23 @@ class TextBlock:
     block_number: int
     bbox: BoundingBox
     text: str
+
+
+@dataclass
+class Chunk:
+    """Represents a text chunk for retrieval.
+    
+    Attributes:
+        chunk_id: Unique identifier for the chunk
+        source: The filename of the source document
+        page_start: First page number in the chunk (1-indexed)
+        page_end: Last page number in the chunk (1-indexed)
+        text: The chunk text content
+        char_count: Number of characters in the chunk
+    """
+    chunk_id: str
+    source: str
+    page_start: int
+    page_end: int
+    text: str
+    char_count: int
