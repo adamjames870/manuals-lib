@@ -17,7 +17,7 @@ def test_score_chunk_exact_phrase():
     chunk_text = "This is a test document about Python programming."
     query = "Python programming"
     
-    score = score_chunk(chunk_text, query)
+    score, _, _, _ = score_chunk(chunk_text, query)
     
     # Should have high score for exact phrase match
     assert score >= 10.0
@@ -28,7 +28,7 @@ def test_score_chunk_case_insensitive():
     chunk_text = "This is a TEST document."
     query = "test"
     
-    score = score_chunk(chunk_text, query)
+    score, _, _, _ = score_chunk(chunk_text, query)
     
     assert score > 0
 
@@ -38,7 +38,7 @@ def test_score_chunk_individual_keywords():
     chunk_text = "Python is great. I love Python. Python rocks."
     query = "Python"
     
-    score = score_chunk(chunk_text, query)
+    score, _, _, _ = score_chunk(chunk_text, query)
     
     # Should score for multiple occurrences
     assert score > 0
@@ -49,17 +49,20 @@ def test_score_chunk_no_match():
     chunk_text = "This is about Java programming."
     query = "Python"
     
-    score = score_chunk(chunk_text, query)
+    score, matched_terms, exact_phrase_match, first_match_pos = score_chunk(chunk_text, query)
     
     assert score == 0.0
+    assert matched_terms == []
+    assert exact_phrase_match is False
+    assert first_match_pos == -1
 
 
 def test_score_chunk_phrase_higher_than_keywords():
     """Test that exact phrase scores higher than individual keywords."""
     chunk_text = "Python programming is fun. Python is great. Programming rocks."
     
-    phrase_score = score_chunk(chunk_text, "Python programming")
-    keyword_score = score_chunk(chunk_text, "Python")
+    phrase_score, _, _, _ = score_chunk(chunk_text, "Python programming")
+    keyword_score, _, _, _ = score_chunk(chunk_text, "Python")
     
     # Phrase match should score higher
     assert phrase_score > keyword_score
@@ -70,10 +73,10 @@ def test_score_chunk_multiple_phrase_occurrences():
     chunk_text = "Python programming. More Python programming. Even more Python programming."
     query = "Python programming"
     
-    score = score_chunk(chunk_text, query)
+    score, _, _, _ = score_chunk(chunk_text, query)
     
-    # Should count all three occurrences
-    assert score >= 30.0  # 3 phrases * 10 points each
+    # Should count all three occurrences (now 100 points each)
+    assert score >= 300.0  # 3 phrases * 100 points each
 
 
 def test_search_chunks_basic():
