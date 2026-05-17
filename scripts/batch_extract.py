@@ -90,10 +90,15 @@ def generate_report(pdf_path: Path, pages: list, report_path: Path) -> None:
         report += "\n## Warnings\n\n"
         
         if empty_pages:
-            report += f"- **Empty Pages** ({len(empty_pages)}): {', '.join(map(str, empty_pages))}\n"
+            empty_list = ', '.join(map(str, empty_pages))
+            report += f"- **Empty Pages** ({len(empty_pages)}): {empty_list}\n"
         
         if short_pages:
-            report += f"- **Suspiciously Short Pages** ({len(short_pages)}, <100 chars): {', '.join(map(str, short_pages))}\n"
+            short_list = ', '.join(map(str, short_pages))
+            report += (
+                f"- **Suspiciously Short Pages** ({len(short_pages)}, "
+                f"<100 chars): {short_list}\n"
+            )
     
     report_path.parent.mkdir(parents=True, exist_ok=True)
     
