@@ -435,9 +435,19 @@ def test_search_chunks_multiple_sources():
     
     matches = search_chunks(chunks, "Python programming", top_k=5)
     
-    # Should find both Python chunks
-    assert len(matches) == 2
+    # Should find all 3 chunks (Java chunk matches on "programming" keyword)
+    assert len(matches) == 3
+    
+    # Top 2 should be the Python chunks with exact phrase matches
     assert matches[0].source in ["manual1.pdf", "manual2.pdf"]
     assert matches[1].source in ["manual1.pdf", "manual2.pdf"]
-    # Should not include Java chunk
-    assert all(m.source != "manual3.pdf" for m in matches)
+    assert matches[0].exact_phrase_match is True
+    assert matches[1].exact_phrase_match is True
+    
+    # Java chunk should rank lowest (keyword match only)
+    assert matches[2].source == "manual3.pdf"
+    assert matches[2].exact_phrase_match is False
+    
+    # Python chunks should score much higher than Java chunk
+    assert matches[0].score > matches[2].score * 10
+    assert matches[1].score > matches[2].score * 10
