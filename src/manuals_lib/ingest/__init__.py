@@ -1,6 +1,6 @@
 """PDF ingestion module."""
 
-from manuals_lib.ingest.models import PageContent
-from manuals_lib.ingest.pdf_extractor import extract_pdf
+from manuals_lib.ingest.models import BoundingBox, PageContent, TextBlock
+from manuals_lib.ingest.pdf_extractor import extract_pdf, extract_pdf_blocks
 
-__all__ = ["PageContent", "extract_pdf"]
+__all__ = ["BoundingBox", "PageContent", "TextBlock", "extract_pdf", "extract_pdf_blocks"]

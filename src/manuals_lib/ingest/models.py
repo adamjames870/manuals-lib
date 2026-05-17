@@ -15,3 +15,37 @@ class PageContent:
     source: str
     page_number: int
     text: str
+
+
+@dataclass
+class BoundingBox:
+    """Represents a bounding box with coordinates.
+    
+    Attributes:
+        x0: Left x coordinate
+        y0: Top y coordinate
+        x1: Right x coordinate
+        y1: Bottom y coordinate
+    """
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+
+
+@dataclass
+class TextBlock:
+    """Represents a text block extracted from a PDF page.
+    
+    Attributes:
+        source: The filename of the source document
+        page_number: The page number (1-indexed)
+        block_number: The block number within the page (0-indexed)
+        bbox: Bounding box coordinates of the block
+        text: The extracted text content from the block
+    """
+    source: str
+    page_number: int
+    block_number: int
+    bbox: BoundingBox
+    text: str
