@@ -41,7 +41,7 @@ def main():
         console.print(f"[red]Error:[/red] Chunks file not found: {chunks_path}")
         return 1
     
-    console.print(f"\n[blue]Building embedding index[/blue]")
+    console.print("\n[blue]Building embedding index[/blue]")
     console.print(f"[dim]Chunks:[/dim] {chunks_path}")
     console.print(f"[dim]Model:[/dim] {args.model}")
     console.print(f"[dim]Output:[/dim] {output_dir}\n")
@@ -63,10 +63,10 @@ def main():
             progress.update(task, description="[green]✓[/green] Index built successfully")
             
             console.print(f"\n[green]Index created:[/green] {index_dir}")
-            console.print(f"  → manifest.json")
-            console.print(f"  → chunks.json")
-            console.print(f"  → embeddings.npy")
-            console.print(f"\n[blue]Statistics:[/blue]")
+            console.print("  → manifest.json")
+            console.print("  → chunks.json")
+            console.print("  → embeddings.npy")
+            console.print("\n[blue]Statistics:[/blue]")
             console.print(f"  Chunks: {manifest.chunk_count}")
             console.print(f"  Embedding dimension: {manifest.embedding_dim}")
             console.print(f"  Model: {manifest.model_name}")
