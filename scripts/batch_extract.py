@@ -7,7 +7,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from manuals_lib.ingest import extract_pdf
+from manuals_lib.ingest import extract_pdf, extract_pdf_blocks
 
 
 def get_output_path(pdf_path: Path, output_dir: Path) -> Path:
@@ -36,6 +36,20 @@ def get_report_path(pdf_path: Path, output_dir: Path) -> Path:
     """
     stem = pdf_path.stem
     return output_dir / f"{stem}.report.md"
+
+
+def get_blocks_path(pdf_path: Path, output_dir: Path) -> Path:
+    """Generate output path for blocks JSON file.
+    
+    Args:
+        pdf_path: Path to the source PDF file
+        output_dir: Directory to write output files
+        
+    Returns:
+        Path to the output blocks JSON file
+    """
+    stem = pdf_path.stem
+    return output_dir / f"{stem}.blocks.json"
 
 
 def pdf_already_extracted(pdf_path: Path, output_dir: Path) -> bool:
@@ -106,13 +120,16 @@ def generate_report(pdf_path: Path, pages: list, report_path: Path) -> None:
         f.write(report)
 
 
-def extract_to_json(pdf_path: Path, output_path: Path, report_path: Path) -> None:
+def extract_to_json(
+    pdf_path: Path, output_path: Path, report_path: Path, blocks_path: Path
+) -> None:
     """Extract PDF content and write to JSON file with report.
     
     Args:
         pdf_path: Path to the source PDF file
         output_path: Path to write the JSON output
         report_path: Path to write the markdown report
+        blocks_path: Path to write the blocks JSON output
     """
     pages = extract_pdf(pdf_path)
     
@@ -134,6 +151,29 @@ def extract_to_json(pdf_path: Path, output_path: Path, report_path: Path) -> Non
         json.dump(output_data, f, indent=2, ensure_ascii=False)
     
     generate_report(pdf_path, pages, report_path)
+    
+    # Extract and save blocks
+    blocks = extract_pdf_blocks(pdf_path)
+    
+    blocks_data = {
+        "source": pdf_path.name,
+        "total_blocks": len(blocks),
+        "blocks": [
+            {
+                "page_number": block.page_number,
+                "block_number": block.block_number,
+                "x0": block.bbox.x0,
+                "y0": block.bbox.y0,
+                "x1": block.bbox.x1,
+                "y1": block.bbox.y1,
+                "text": block.text,
+            }
+            for block in blocks
+        ],
+    }
+    
+    with open(blocks_path, "w", encoding="utf-8") as f:
+        json.dump(blocks_data, f, indent=2, ensure_ascii=False)
 
 
 def main():
@@ -178,10 +218,12 @@ def main():
             try:
                 output_path = get_output_path(pdf_path, processed_dir)
                 report_path = get_report_path(pdf_path, processed_dir)
-                extract_to_json(pdf_path, output_path, report_path)
+                blocks_path = get_blocks_path(pdf_path, processed_dir)
+                extract_to_json(pdf_path, output_path, report_path, blocks_path)
                 progress.update(task, description=f"[green]✓[/green] {pdf_path.name}")
                 console.print(f"  → {output_path}")
                 console.print(f"  → {report_path}")
+                console.print(f"  → {blocks_path}")
             except Exception as e:
                 progress.update(task, description=f"[red]✗[/red] {pdf_path.name}")
                 console.print(f"  [red]Error:[/red] {e}")
