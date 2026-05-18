@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pymupdf
 
-from manuals_lib.ingest.models import BoundingBox, PageContent, TextBlock
+from manuals_lib.ingest.models import BoundingBox, PageContent, TableData, TextBlock
 from manuals_lib.ingest.ocr_extractor import extract_text_with_ocr, should_use_ocr
 
 logger = logging.getLogger(__name__)
@@ -36,10 +36,14 @@ def extract_pdf(pdf_path: str | Path, use_ocr_fallback: bool = True) -> list[Pag
         for page_num, page in enumerate(doc, start=1):
             text = page.get_text()
             original_text_len = len(text.strip())
+            extraction_method = "pymupdf"
+            ocr_engine = None
+            ocr_trigger_reason = None
             
             # If text extraction yields very little content and OCR fallback is enabled
             # assume it's a scanned page and use OCR
             if use_ocr_fallback and should_use_ocr(text):
+                ocr_trigger_reason = f"low_text_content_{original_text_len}_chars"
                 logger.info(
                     f"Page {page_num}: Low text content ({original_text_len} chars), "
                     "attempting OCR"
@@ -48,6 +52,8 @@ def extract_pdf(pdf_path: str | Path, use_ocr_fallback: bool = True) -> list[Pag
                     ocr_text = extract_text_with_ocr(page)
                     if ocr_text and ocr_text.strip():
                         text = ocr_text
+                        extraction_method = "ocr"
+                        ocr_engine = "tesseract"
                         logger.info(
                             f"Page {page_num}: OCR successful, extracted "
                             f"{len(text.strip())} characters"
@@ -57,8 +63,10 @@ def extract_pdf(pdf_path: str | Path, use_ocr_fallback: bool = True) -> list[Pag
                             f"Page {page_num}: OCR returned empty text, "
                             "keeping original extraction"
                         )
+                        ocr_trigger_reason = None
                 except Exception as e:
                     logger.error(f"Page {page_num}: OCR failed: {e}")
+                    ocr_trigger_reason = None
                     # If OCR fails, fall back to whatever text we got
             
             pages.append(
@@ -66,10 +74,97 @@ def extract_pdf(pdf_path: str | Path, use_ocr_fallback: bool = True) -> list[Pag
                     source=pdf_path.name,
                     page_number=page_num,
                     text=text,
+                    extraction_method=extraction_method,
+                    ocr_engine=ocr_engine,
+                    ocr_trigger_reason=ocr_trigger_reason,
                 )
             )
     
     return pages
+
+
+def extract_pdf_tables(pdf_path: str | Path) -> list[TableData]:
+    """Extract tables from a PDF file using PyMuPDF's table detection.
+    
+    Args:
+        pdf_path: Path to the PDF file to extract
+        
+    Returns:
+        List of TableData objects with table content
+        
+    Raises:
+        FileNotFoundError: If the PDF file does not exist
+        pymupdf.FileDataError: If the file is not a valid PDF
+    """
+    pdf_path = Path(pdf_path)
+    
+    if not pdf_path.exists():
+        raise FileNotFoundError(f"PDF file not found: {pdf_path}")
+    
+    tables = []
+    table_counter = 0
+    
+    with pymupdf.open(pdf_path) as doc:
+        for page_num, page in enumerate(doc, start=1):
+            # Find tables on this page
+            page_tables = page.find_tables()
+            
+            if not page_tables or not page_tables.tables:
+                continue
+            
+            for table_idx, table in enumerate(page_tables.tables):
+                table_counter += 1
+                table_id = f"{pdf_path.stem}_table_{table_counter}"
+                
+                # Extract table data
+                try:
+                    # Get bounding box if available
+                    bbox = None
+                    if hasattr(table, 'bbox') and table.bbox:
+                        bbox = BoundingBox(
+                            x0=table.bbox[0],
+                            y0=table.bbox[1],
+                            x1=table.bbox[2],
+                            y1=table.bbox[3],
+                        )
+                    
+                    # Extract rows
+                    rows = table.extract()
+                    
+                    if not rows:
+                        continue
+                    
+                    # Try to infer headers from first row
+                    headers = None
+                    if rows and all(cell and isinstance(cell, str) for cell in rows[0]):
+                        # First row looks like headers if cells are non-empty strings
+                        first_row = [str(cell).strip() for cell in rows[0]]
+                        if all(first_row):
+                            headers = first_row
+                    
+                    tables.append(
+                        TableData(
+                            table_id=table_id,
+                            source=pdf_path.name,
+                            page_number=page_num,
+                            bbox=bbox,
+                            extraction_method="pymupdf_find_tables",
+                            headers=headers,
+                            rows=[[str(cell) if cell else "" for cell in row] for row in rows],
+                        )
+                    )
+                    
+                    logger.info(
+                        f"Page {page_num}: Extracted table {table_id} "
+                        f"with {len(rows)} rows"
+                    )
+                    
+                except Exception as e:
+                    logger.error(
+                        f"Page {page_num}: Failed to extract table {table_idx}: {e}"
+                    )
+    
+    return tables
 
 
 def extract_pdf_blocks(pdf_path: str | Path, use_ocr_fallback: bool = True) -> list[TextBlock]:

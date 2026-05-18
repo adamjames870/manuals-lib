@@ -15,6 +15,10 @@ class ChunkMetadata:
         page_start: Starting page number
         page_end: Ending page number
         text: Chunk text content
+        chunk_type: Type of chunk (content, toc, table, etc.)
+        extraction_method: Method used to extract source text
+        table_id: Reference to source table if applicable
+        section_title: Section heading if available
     """
     row_index: int
     chunk_id: str
@@ -22,6 +26,10 @@ class ChunkMetadata:
     page_start: int
     page_end: int
     text: str
+    chunk_type: str = "content"
+    extraction_method: str = "pymupdf"
+    table_id: str | None = None
+    section_title: str | None = None
 
 
 @dataclass

@@ -14,10 +14,16 @@ class NormalizedPage:
         source: The filename of the source document
         page_number: The page number (1-indexed)
         text: The normalized text content
+        extraction_method: Method used to extract text (pymupdf or ocr)
+        ocr_engine: OCR engine used if extraction_method is ocr
+        ocr_trigger_reason: Reason OCR was triggered
     """
     source: str
     page_number: int
     text: str
+    extraction_method: str = "pymupdf"
+    ocr_engine: str | None = None
+    ocr_trigger_reason: str | None = None
 
 
 def normalize_line_endings(text: str) -> str:
@@ -172,6 +178,9 @@ def normalize_pages(pages: list[PageContent], join_wrapped: bool = True) -> list
                 source=page.source,
                 page_number=page.page_number,
                 text=normalized_text,
+                extraction_method=page.extraction_method,
+                ocr_engine=page.ocr_engine,
+                ocr_trigger_reason=page.ocr_trigger_reason,
             )
         )
     

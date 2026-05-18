@@ -11,10 +11,16 @@ class PageContent:
         source: The filename of the source document
         page_number: The page number (1-indexed)
         text: The extracted text content from the page
+        extraction_method: Method used to extract text (pymupdf or ocr)
+        ocr_engine: OCR engine used if extraction_method is ocr
+        ocr_trigger_reason: Reason OCR was triggered
     """
     source: str
     page_number: int
     text: str
+    extraction_method: str = "pymupdf"
+    ocr_engine: str | None = None
+    ocr_trigger_reason: str | None = None
 
 
 @dataclass
@@ -52,6 +58,28 @@ class TextBlock:
 
 
 @dataclass
+class TableData:
+    """Represents extracted table data.
+    
+    Attributes:
+        table_id: Unique identifier for this table
+        source: The filename of the source document
+        page_number: The page number where table appears (1-indexed)
+        bbox: Bounding box coordinates (optional)
+        extraction_method: Method used to extract table
+        headers: Inferred column headers (optional)
+        rows: List of rows, each row is a list of cell values
+    """
+    table_id: str
+    source: str
+    page_number: int
+    bbox: BoundingBox | None
+    extraction_method: str
+    headers: list[str] | None
+    rows: list[list[str]]
+
+
+@dataclass
 class Chunk:
     """Represents a text chunk for retrieval.
     
@@ -62,6 +90,10 @@ class Chunk:
         page_end: Last page number in the chunk (1-indexed)
         text: The chunk text content
         char_count: Number of characters in the chunk
+        chunk_type: Type of chunk (content, toc, table, etc.)
+        extraction_method: Method used to extract source text
+        table_id: Reference to source table if chunk_type is table/table_row
+        section_title: Section heading if available
     """
     chunk_id: str
     source: str
@@ -69,3 +101,7 @@ class Chunk:
     page_end: int
     text: str
     char_count: int
+    chunk_type: str = "content"
+    extraction_method: str = "pymupdf"
+    table_id: str | None = None
+    section_title: str | None = None

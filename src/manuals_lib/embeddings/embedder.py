@@ -129,6 +129,10 @@ def build_index(
                 page_start=chunk.get("page_start", 0),
                 page_end=chunk.get("page_end", 0),
                 text=chunk.get("text", ""),
+                chunk_type=chunk.get("chunk_type", "content"),
+                extraction_method=chunk.get("extraction_method", "pymupdf"),
+                table_id=chunk.get("table_id"),
+                section_title=chunk.get("section_title"),
             )
         )
         texts.append(chunk.get("text", ""))
@@ -160,6 +164,10 @@ def build_index(
                 "page_start": cm.page_start,
                 "page_end": cm.page_end,
                 "text": cm.text,
+                "chunk_type": cm.chunk_type,
+                "extraction_method": cm.extraction_method,
+                "table_id": cm.table_id,
+                "section_title": cm.section_title,
             }
             for cm in chunk_metadata
         ]
@@ -267,6 +275,10 @@ def load_index(index_dir: Path) -> tuple[IndexManifest, list[ChunkMetadata], np.
             page_start=chunk["page_start"],
             page_end=chunk["page_end"],
             text=chunk["text"],
+            chunk_type=chunk.get("chunk_type", "content"),
+            extraction_method=chunk.get("extraction_method", "pymupdf"),
+            table_id=chunk.get("table_id"),
+            section_title=chunk.get("section_title"),
         )
         for chunk in chunks_data["chunks"]
     ]
@@ -281,6 +293,7 @@ def semantic_search(
     query: str,
     index_dir: Path,
     top_k: int = 5,
+    exclude_chunk_types: list[str] | None = None,
 ) -> list[tuple[int, float, ChunkMetadata]]:
     """Perform semantic search over an embedding index.
     
@@ -288,6 +301,7 @@ def semantic_search(
         query: Search query text
         index_dir: Directory containing the embedding index
         top_k: Number of top results to return
+        exclude_chunk_types: List of chunk types to exclude from results
         
     Returns:
         List of (rank, similarity_score, chunk_metadata) tuples, sorted by similarity
@@ -299,8 +313,24 @@ def semantic_search(
     if top_k < 1:
         raise ValueError(f"top_k must be >= 1, got {top_k}")
     
+    # Default exclusions
+    if exclude_chunk_types is None:
+        exclude_chunk_types = ['toc', 'front_matter', 'index']
+    
     # Load index
     manifest, chunk_metadata, embeddings = load_index(index_dir)
+    
+    # Filter chunks by type
+    if exclude_chunk_types:
+        filtered_indices = [
+            i for i, chunk in enumerate(chunk_metadata)
+            if chunk.chunk_type not in exclude_chunk_types
+        ]
+        chunk_metadata = [chunk_metadata[i] for i in filtered_indices]
+        embeddings = embeddings[filtered_indices]
+    
+    if len(chunk_metadata) == 0:
+        return []
     
     # Initialize embedder with same model as index
     embedder = Embedder(manifest.model_name)

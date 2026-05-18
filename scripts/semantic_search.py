@@ -55,6 +55,7 @@ def search_all_indexes(
     query: str,
     indexes: list[Path],
     top_k: int = 5,
+    exclude_chunk_types: list[str] | None = None,
 ) -> list[tuple[int, float, ChunkMetadata, Path]]:
     """Search multiple indexes and return combined results.
     
@@ -62,6 +63,7 @@ def search_all_indexes(
         query: Search query text
         indexes: List of index directories to search
         top_k: Number of results to return per index
+        exclude_chunk_types: List of chunk types to exclude
         
     Returns:
         List of (rank, similarity_score, chunk_metadata, index_path) tuples,
@@ -75,6 +77,7 @@ def search_all_indexes(
                 query=query,
                 index_dir=index_dir,
                 top_k=top_k,
+                exclude_chunk_types=exclude_chunk_types,
             )
             # Add index_dir to each result
             for _, similarity, chunk in results:
@@ -174,6 +177,11 @@ def main():
         default=5,
         help="Number of results to return (default: 5)",
     )
+    parser.add_argument(
+        "--include-toc",
+        action="store_true",
+        help="Include TOC/front-matter/index chunks in results",
+    )
     
     args = parser.parse_args()
     console = Console()
@@ -200,6 +208,9 @@ def main():
             return 1
         search_mode = "all"
     
+    # Determine exclusions
+    exclude_types = [] if args.include_toc else None
+    
     # Perform search
     try:
         with console.status("[bold blue]Searching...", spinner="dots"):
@@ -208,6 +219,7 @@ def main():
                     query=args.query,
                     index_dir=indexes[0],
                     top_k=args.top_k,
+                    exclude_chunk_types=exclude_types,
                 )
                 # Convert to format with index_dir
                 results_with_index = [
@@ -219,6 +231,7 @@ def main():
                     query=args.query,
                     indexes=indexes,
                     top_k=args.top_k,
+                    exclude_chunk_types=exclude_types,
                 )
     except FileNotFoundError as e:
         console.print(f"[red]Error:[/red] {e}")
@@ -260,7 +273,8 @@ def main():
         table.add_row("Rank:", f"[bold]{rank}[/bold] | Score: [{score_color}]{similarity:.4f}[/{score_color}]")
         
         # Source info
-        table.add_row("Source:", f"[cyan]{chunk.source}[/cyan] | {page_range}")
+        type_label = f" [{chunk.chunk_type}]" if chunk.chunk_type != "content" else ""
+        table.add_row("Source:", f"[cyan]{chunk.source}[/cyan] | {page_range}{type_label}")
         
         # Index (only for multi-index search)
         if search_mode == "all":

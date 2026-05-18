@@ -185,6 +185,125 @@ def test_load_index_missing_embeddings(tmp_path):
         load_index(index_dir)
 
 
+def test_semantic_search_excludes_toc_by_default(tmp_path):
+    """Test that TOC chunks are excluded from search by default."""
+    from manuals_lib.embeddings.embedder import build_index, semantic_search
+    
+    # Create test chunks with different types
+    chunks_data = {
+        "source": "test.pdf",
+        "total_chunks": 3,
+        "chunks": [
+            {
+                "chunk_id": "test_0",
+                "source": "test.pdf",
+                "page_start": 1,
+                "page_end": 1,
+                "char_count": 50,
+                "text": "Table of Contents\nChapter 1 ... 5\nChapter 2 ... 10",
+                "chunk_type": "toc",
+                "extraction_method": "pymupdf",
+                "table_id": None,
+                "section_title": None,
+            },
+            {
+                "chunk_id": "test_1",
+                "source": "test.pdf",
+                "page_start": 2,
+                "page_end": 2,
+                "char_count": 100,
+                "text": "This document describes the technical specifications of the product.",
+                "chunk_type": "content",
+                "extraction_method": "pymupdf",
+                "table_id": None,
+                "section_title": None,
+            },
+            {
+                "chunk_id": "test_2",
+                "source": "test.pdf",
+                "page_start": 3,
+                "page_end": 3,
+                "char_count": 80,
+                "text": "The product operates at high efficiency with low maintenance.",
+                "chunk_type": "content",
+                "extraction_method": "pymupdf",
+                "table_id": None,
+                "section_title": None,
+            },
+        ],
+    }
+    
+    chunks_file = tmp_path / "chunks.json"
+    with open(chunks_file, "w") as f:
+        import json
+        json.dump(chunks_data, f)
+    
+    index_dir = tmp_path / "index"
+    build_index(chunks_file, index_dir)
+    
+    # Search should exclude TOC by default
+    results = semantic_search("technical specifications", index_dir, top_k=5)
+    
+    # Should only return content chunks, not TOC
+    assert len(results) == 2
+    assert all(chunk.chunk_type == "content" for _, _, chunk in results)
+
+
+def test_semantic_search_include_all_types(tmp_path):
+    """Test that all chunk types can be included if requested."""
+    from manuals_lib.embeddings.embedder import build_index, semantic_search
+    
+    chunks_data = {
+        "source": "test.pdf",
+        "total_chunks": 2,
+        "chunks": [
+            {
+                "chunk_id": "test_0",
+                "source": "test.pdf",
+                "page_start": 1,
+                "page_end": 1,
+                "char_count": 50,
+                "text": "Table of Contents\nChapter 1 ... 5",
+                "chunk_type": "toc",
+                "extraction_method": "pymupdf",
+                "table_id": None,
+                "section_title": None,
+            },
+            {
+                "chunk_id": "test_1",
+                "source": "test.pdf",
+                "page_start": 2,
+                "page_end": 2,
+                "char_count": 100,
+                "text": "Technical content about the product.",
+                "chunk_type": "content",
+                "extraction_method": "pymupdf",
+                "table_id": None,
+                "section_title": None,
+            },
+        ],
+    }
+    
+    chunks_file = tmp_path / "chunks.json"
+    with open(chunks_file, "w") as f:
+        import json
+        json.dump(chunks_data, f)
+    
+    index_dir = tmp_path / "index"
+    build_index(chunks_file, index_dir)
+    
+    # Search with no exclusions
+    results = semantic_search(
+        "table of contents",
+        index_dir,
+        top_k=5,
+        exclude_chunk_types=[]
+    )
+    
+    # Should return all chunks
+    assert len(results) == 2
+
+
 def test_semantic_search_invalid_top_k(tmp_path):
     """Test semantic search with invalid top_k."""
     index_dir = tmp_path / "test_index"

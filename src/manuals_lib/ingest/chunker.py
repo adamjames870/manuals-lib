@@ -3,8 +3,9 @@
 import re
 from dataclasses import dataclass
 
-from manuals_lib.ingest.models import Chunk
+from manuals_lib.ingest.models import Chunk, TableData
 from manuals_lib.ingest.normalizer import NormalizedPage
+from manuals_lib.ingest.table_utils import detect_chunk_type, flatten_table_row
 
 
 @dataclass
@@ -80,6 +81,7 @@ def chunk_pages(
     current_size = 0
     current_page_start = pages[0].page_number
     current_page_end = pages[0].page_number
+    current_extraction_method = pages[0].extraction_method
     
     # Previous chunk text for overlap
     previous_chunk_text = ""
@@ -102,6 +104,8 @@ def chunk_pages(
                         page_end=current_page_end,
                         text=chunk_text,
                         char_count=len(chunk_text),
+                        chunk_type=detect_chunk_type(chunk_text),
+                        extraction_method=current_extraction_method,
                     )
                 )
                 
@@ -120,6 +124,7 @@ def chunk_pages(
                 
                 current_page_start = page.page_number
                 current_page_end = page.page_number
+                current_extraction_method = page.extraction_method
             
             # Add paragraph to current chunk
             current_text.append(paragraph)
@@ -138,6 +143,8 @@ def chunk_pages(
                         page_end=current_page_end,
                         text=chunk_text,
                         char_count=len(chunk_text),
+                        chunk_type=detect_chunk_type(chunk_text),
+                        extraction_method=current_extraction_method,
                     )
                 )
                 
@@ -156,6 +163,7 @@ def chunk_pages(
                 
                 current_page_start = page.page_number
                 current_page_end = page.page_number
+                current_extraction_method = page.extraction_method
     
     # Finalize any remaining text
     if current_text:
@@ -168,8 +176,62 @@ def chunk_pages(
                 page_end=current_page_end,
                 text=chunk_text,
                 char_count=len(chunk_text),
+                chunk_type=detect_chunk_type(chunk_text),
+                extraction_method=current_extraction_method,
             )
         )
+    
+    return chunks
+
+
+def chunk_tables(tables: list[TableData]) -> list[Chunk]:
+    """Convert tables into retrieval-ready chunks.
+    
+    Args:
+        tables: List of TableData objects
+        
+    Returns:
+        List of Chunk objects derived from tables
+    """
+    chunks = []
+    
+    for table in tables:
+        # Determine table title from first row if it looks like a title
+        table_title = None
+        data_rows = table.rows
+        
+        # If first row has only one non-empty cell, treat it as title
+        if data_rows and len([cell for cell in data_rows[0] if cell.strip()]) == 1:
+            table_title = next((cell for cell in data_rows[0] if cell.strip()), None)
+            data_rows = data_rows[1:]
+        
+        # Create a chunk for each row
+        for row_idx, row in enumerate(data_rows):
+            # Skip empty rows
+            if not any(cell.strip() for cell in row):
+                continue
+            
+            # Flatten row to text
+            row_text = flatten_table_row(row, table.headers, table_title)
+            
+            if not row_text:
+                continue
+            
+            chunk_id = f"{table.table_id}_row_{row_idx}"
+            
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id,
+                    source=table.source,
+                    page_start=table.page_number,
+                    page_end=table.page_number,
+                    text=row_text,
+                    char_count=len(row_text),
+                    chunk_type="table_row",
+                    extraction_method=table.extraction_method,
+                    table_id=table.table_id,
+                )
+            )
     
     return chunks
 

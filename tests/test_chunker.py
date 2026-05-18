@@ -136,6 +136,139 @@ def test_chunk_pages_single_short_page():
     assert chunks[0].page_end == 1
 
 
+def test_chunk_pages_preserves_extraction_method():
+    """Test that chunking preserves extraction method metadata."""
+    pages = [
+        NormalizedPage(
+            source="test.pdf",
+            page_number=1,
+            text="First page content. " * 100,
+            extraction_method="ocr",
+            ocr_engine="tesseract",
+            ocr_trigger_reason="low_text_content",
+        ),
+        NormalizedPage(
+            source="test.pdf",
+            page_number=2,
+            text="Second page content. " * 100,
+            extraction_method="pymupdf",
+        ),
+    ]
+    
+    chunks = chunk_pages(pages)
+    
+    assert len(chunks) > 0
+    # First chunk should have OCR metadata
+    assert chunks[0].extraction_method == "ocr"
+
+
+def test_chunk_pages_detects_chunk_type():
+    """Test that chunking detects chunk types."""
+    pages = [
+        NormalizedPage(
+            source="test.pdf",
+            page_number=1,
+            text="Table of Contents\n\nChapter 1 ........ 5\nChapter 2 ........ 10",
+        ),
+        NormalizedPage(
+            source="test.pdf",
+            page_number=2,
+            text="This is regular content about the product specifications.",
+        ),
+    ]
+    
+    chunks = chunk_pages(pages)
+    
+    assert len(chunks) >= 2
+    # First chunk should be detected as TOC
+    assert chunks[0].chunk_type == "toc"
+    # Second chunk should be content
+    assert any(c.chunk_type == "content" for c in chunks)
+
+
+def test_chunk_tables():
+    """Test chunking tables into rows."""
+    from manuals_lib.ingest.chunker import chunk_tables
+    from manuals_lib.ingest.models import TableData
+    
+    table = TableData(
+        table_id="test_table_1",
+        source="test.pdf",
+        page_number=5,
+        bbox=None,
+        extraction_method="pymupdf_find_tables",
+        headers=["Item", "Value", "Unit"],
+        rows=[
+            ["Temperature", "25", "°C"],
+            ["Pressure", "100", "kPa"],
+            ["Flow Rate", "50", "L/min"],
+        ],
+    )
+    
+    chunks = chunk_tables([table])
+    
+    assert len(chunks) == 3
+    assert all(c.chunk_type == "table_row" for c in chunks)
+    assert all(c.table_id == "test_table_1" for c in chunks)
+    assert all(c.page_start == 5 for c in chunks)
+    
+    # Check that row data is flattened
+    assert "Item: Temperature" in chunks[0].text
+    assert "Value: 25" in chunks[0].text
+    assert "Unit: °C" in chunks[0].text
+
+
+def test_chunk_tables_with_title():
+    """Test chunking tables with title row."""
+    from manuals_lib.ingest.chunker import chunk_tables
+    from manuals_lib.ingest.models import TableData
+    
+    table = TableData(
+        table_id="test_table_2",
+        source="test.pdf",
+        page_number=10,
+        bbox=None,
+        extraction_method="pymupdf_find_tables",
+        headers=None,
+        rows=[
+            ["Technical Specifications", "", ""],  # Title row
+            ["Length", "5.2", "m"],
+            ["Width", "2.1", "m"],
+        ],
+    )
+    
+    chunks = chunk_tables([table])
+    
+    # Should skip title row and create chunks for data rows
+    assert len(chunks) == 2
+    assert "Table: Technical Specifications" in chunks[0].text
+
+
+def test_chunk_tables_skips_empty_rows():
+    """Test that empty table rows are skipped."""
+    from manuals_lib.ingest.chunker import chunk_tables
+    from manuals_lib.ingest.models import TableData
+    
+    table = TableData(
+        table_id="test_table_3",
+        source="test.pdf",
+        page_number=15,
+        bbox=None,
+        extraction_method="pymupdf_find_tables",
+        headers=["A", "B"],
+        rows=[
+            ["Value1", "Value2"],
+            ["", ""],  # Empty row
+            ["Value3", "Value4"],
+        ],
+    )
+    
+    chunks = chunk_tables([table])
+    
+    # Should skip empty row
+    assert len(chunks) == 2
+
+
 def test_chunk_pages_has_overlap():
     """Test that adjacent chunks have overlap."""
     # Create content that will span multiple chunks
