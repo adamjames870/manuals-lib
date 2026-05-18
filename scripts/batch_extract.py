@@ -8,7 +8,14 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from manuals_lib.embeddings import build_index
-from manuals_lib.ingest import chunk_pages, extract_pdf, extract_pdf_blocks, normalize_pages
+from manuals_lib.ingest import (
+    chunk_pages,
+    chunk_tables,
+    extract_pdf,
+    extract_pdf_blocks,
+    extract_pdf_tables,
+    normalize_pages,
+)
 
 
 def get_output_path(pdf_path: Path, output_dir: Path) -> Path:
@@ -81,6 +88,20 @@ def get_chunks_path(pdf_path: Path, output_dir: Path) -> Path:
     return output_dir / f"{stem}.chunks.json"
 
 
+def get_tables_path(pdf_path: Path, output_dir: Path) -> Path:
+    """Generate output path for tables JSON file.
+    
+    Args:
+        pdf_path: Path to the source PDF file
+        output_dir: Directory to write output files
+        
+    Returns:
+        Path to the output tables JSON file
+    """
+    stem = pdf_path.stem
+    return output_dir / f"{stem}.tables.json"
+
+
 def pdf_already_extracted(pdf_path: Path, output_dir: Path) -> bool:
     """Check if a PDF has already been extracted.
     
@@ -99,7 +120,8 @@ def generate_report(
     pdf_path: Path,
     pages: list,
     report_path: Path,
-    chunks: list | None = None
+    chunks: list | None = None,
+    tables: list | None = None
 ) -> None:
     """Generate a markdown report with extraction statistics.
     
@@ -108,12 +130,23 @@ def generate_report(
         pages: List of PageContent objects
         report_path: Path to write the markdown report
         chunks: Optional list of Chunk objects
+        tables: Optional list of TableData objects
     """
     # Calculate statistics
     char_counts = [len(page.text) for page in pages]
     total_chars = sum(char_counts)
     empty_pages = [i + 1 for i, count in enumerate(char_counts) if count == 0]
     short_pages = [i + 1 for i, count in enumerate(char_counts) if 0 < count < 100]
+    
+    # Count OCR pages
+    ocr_pages = [
+        page.page_number for page in pages 
+        if page.extraction_method == "ocr"
+    ]
+    native_pages = [
+        page.page_number for page in pages 
+        if page.extraction_method == "pymupdf"
+    ]
     
     # Generate markdown report
     report = f"""# Extraction Report: {pdf_path.name}
@@ -125,14 +158,47 @@ def generate_report(
 - **Total Characters**: {total_chars:,}
 - **Average Characters per Page**: {total_chars / len(pages):.0f}
 
+## Extraction Summary
+
+- **Native Extraction Pages**: {len(native_pages)}
+- **OCR Pages**: {len(ocr_pages)}
+- **Empty Pages**: {len(empty_pages)}
+- **Suspiciously Short Pages** (<100 chars): {len(short_pages)}
+
 ## Page Statistics
 
-| Page | Characters |
-|------|------------|
+| Page | Characters | Method |
+|------|------------|--------|
 """
     
-    for page_num, char_count in enumerate(char_counts, start=1):
-        report += f"| {page_num} | {char_count:,} |\n"
+    for page in pages:
+        report += f"| {page.page_number} | {len(page.text):,} | {page.extraction_method} |\n"
+    
+    # Add table statistics if available
+    if tables:
+        table_pages = sorted(set(table.page_number for table in tables))
+        ocr_table_pages = [
+            page_num for page_num in table_pages
+            if any(p.page_number == page_num and p.extraction_method == "ocr" for p in pages)
+        ]
+        
+        report += "\n## Table Summary\n\n"
+        report += f"- **Tables Detected**: {len(tables)}\n"
+        report += f"- **Pages with Tables**: {len(table_pages)}\n"
+        report += f"- **OCR Pages** (table extraction skipped): {len(ocr_table_pages)}\n"
+        
+        if table_pages:
+            pages_list = ', '.join(map(str, table_pages[:20]))
+            if len(table_pages) > 20:
+                pages_list += f", ... ({len(table_pages) - 20} more)"
+            report += f"\n  Table pages: {pages_list}\n"
+        
+        report += "\n### Table Details\n\n"
+        report += "| Table ID | Page | Rows | Has Headers |\n"
+        report += "|----------|------|------|-------------|\n"
+        for table in tables:
+            has_headers = "Yes" if table.headers else "No"
+            report += f"| {table.table_id} | {table.page_number} | {len(table.rows)} | {has_headers} |\n"
     
     # Add chunk statistics if available
     if chunks:
@@ -140,6 +206,11 @@ def generate_report(
         min_chunk = min(chunk_sizes)
         max_chunk = max(chunk_sizes)
         avg_chunk = sum(chunk_sizes) / len(chunk_sizes)
+        
+        # Count by chunk type
+        chunk_types = {}
+        for chunk in chunks:
+            chunk_types[chunk.chunk_type] = chunk_types.get(chunk.chunk_type, 0) + 1
         
         # Count small and large chunks
         small_chunks = [i for i, size in enumerate(chunk_sizes, 1) if size < 500]
@@ -149,6 +220,12 @@ def generate_report(
         cross_page_chunks = [
             i for i, chunk in enumerate(chunks, 1)
             if chunk.page_end > chunk.page_start
+        ]
+        
+        # Count excluded chunks
+        excluded_chunks = [
+            chunk for chunk in chunks
+            if chunk.chunk_type in ('toc', 'front_matter', 'index')
         ]
         
         # Estimate duplicate overlap
@@ -166,6 +243,19 @@ def generate_report(
         report += f"- **Large Chunks** (>2000 chars): {len(large_chunks)}\n"
         report += f"- **Cross-Page Chunks**: {len(cross_page_chunks)}\n"
         report += f"- **Estimated Overlap**: {overlap_estimate:,} characters ({overlap_pct:.1f}%)\n"
+        
+        report += "\n### Chunks by Type\n\n"
+        for chunk_type, count in sorted(chunk_types.items()):
+            report += f"- **{chunk_type}**: {count}\n"
+        
+        report += "\n### Retrieval Diagnostics\n\n"
+        report += f"- **Chunks Excluded from Default Retrieval**: {len(excluded_chunks)}\n"
+        if excluded_chunks:
+            excluded_ids = [chunk.chunk_id for chunk in excluded_chunks[:10]]
+            excluded_list = ', '.join(excluded_ids)
+            if len(excluded_chunks) > 10:
+                excluded_list += f", ... ({len(excluded_chunks) - 10} more)"
+            report += f"\n  Excluded chunk IDs: {excluded_list}\n"
         
         if small_chunks:
             small_list = ', '.join(map(str, small_chunks[:10]))
@@ -207,6 +297,7 @@ def extract_to_json(
     blocks_path: Path,
     normalized_path: Path,
     chunks_path: Path,
+    tables_path: Path,
     skip_normalization: bool = False,
     skip_chunking: bool = False,
     skip_embeddings: bool = False,
@@ -220,11 +311,15 @@ def extract_to_json(
         blocks_path: Path to write the blocks JSON output
         normalized_path: Path to write the normalized JSON output
         chunks_path: Path to write the chunks JSON output
+        tables_path: Path to write the tables JSON output
         skip_normalization: Whether to skip normalization step
         skip_chunking: Whether to skip chunking step
         skip_embeddings: Whether to skip embeddings generation
     """
     pages = extract_pdf(pdf_path)
+    
+    # Extract tables
+    tables = extract_pdf_tables(pdf_path)
     
     output_data = {
         "source": pdf_path.name,
@@ -233,6 +328,9 @@ def extract_to_json(
             {
                 "page_number": page.page_number,
                 "text": page.text,
+                "extraction_method": page.extraction_method,
+                "ocr_engine": page.ocr_engine,
+                "ocr_trigger_reason": page.ocr_trigger_reason,
             }
             for page in pages
         ],
@@ -266,6 +364,32 @@ def extract_to_json(
     with open(blocks_path, "w", encoding="utf-8") as f:
         json.dump(blocks_data, f, indent=2, ensure_ascii=False)
     
+    # Save tables
+    tables_data = {
+        "source": pdf_path.name,
+        "total_tables": len(tables),
+        "tables": [
+            {
+                "table_id": table.table_id,
+                "page_number": table.page_number,
+                "extraction_method": table.extraction_method,
+                "bbox": {
+                    "x0": round(table.bbox.x0, 2),
+                    "y0": round(table.bbox.y0, 2),
+                    "x1": round(table.bbox.x1, 2),
+                    "y1": round(table.bbox.y1, 2),
+                } if table.bbox else None,
+                "headers": table.headers,
+                "row_count": len(table.rows),
+                "rows": table.rows,
+            }
+            for table in tables
+        ],
+    }
+    
+    with open(tables_path, "w", encoding="utf-8") as f:
+        json.dump(tables_data, f, indent=2, ensure_ascii=False)
+    
     # Normalize and save normalized content
     if not skip_normalization:
         normalized_pages = normalize_pages(pages, join_wrapped=True)
@@ -277,6 +401,9 @@ def extract_to_json(
                 {
                     "page_number": page.page_number,
                     "text": page.text,
+                    "extraction_method": page.extraction_method,
+                    "ocr_engine": page.ocr_engine,
+                    "ocr_trigger_reason": page.ocr_trigger_reason,
                 }
                 for page in normalized_pages
             ],
@@ -287,7 +414,14 @@ def extract_to_json(
         
         # Chunk and save chunks
         if not skip_chunking:
-            chunks = chunk_pages(normalized_pages)
+            # Chunk pages
+            page_chunks = chunk_pages(normalized_pages)
+            
+            # Chunk tables
+            table_chunks = chunk_tables(tables)
+            
+            # Combine all chunks
+            chunks = page_chunks + table_chunks
             
             chunks_data = {
                 "source": pdf_path.name,
@@ -299,6 +433,10 @@ def extract_to_json(
                         "page_end": chunk.page_end,
                         "char_count": chunk.char_count,
                         "text": chunk.text,
+                        "chunk_type": chunk.chunk_type,
+                        "extraction_method": chunk.extraction_method,
+                        "table_id": chunk.table_id,
+                        "section_title": chunk.section_title,
                     }
                     for chunk in chunks
                 ],
@@ -315,14 +453,14 @@ def extract_to_json(
                     output_dir=index_dir,
                 )
             
-            # Generate report with chunk statistics
-            generate_report(pdf_path, pages, report_path, chunks)
+            # Generate report with chunk and table statistics
+            generate_report(pdf_path, pages, report_path, chunks, tables)
         else:
             # Generate report without chunk statistics
-            generate_report(pdf_path, pages, report_path)
+            generate_report(pdf_path, pages, report_path, None, tables)
     else:
         # Generate report without normalization or chunking
-        generate_report(pdf_path, pages, report_path)
+        generate_report(pdf_path, pages, report_path, None, tables)
 
 
 def main():
@@ -390,6 +528,7 @@ def main():
                 blocks_path = get_blocks_path(pdf_path, processed_dir)
                 normalized_path = get_normalized_path(pdf_path, processed_dir)
                 chunks_path = get_chunks_path(pdf_path, processed_dir)
+                tables_path = get_tables_path(pdf_path, processed_dir)
                 extract_to_json(
                     pdf_path,
                     output_path,
@@ -397,6 +536,7 @@ def main():
                     blocks_path,
                     normalized_path,
                     chunks_path,
+                    tables_path,
                     skip_normalization=args.skip_normalization,
                     skip_chunking=args.skip_chunking,
                     skip_embeddings=args.skip_embeddings,
@@ -405,6 +545,7 @@ def main():
                 console.print(f"  → {output_path}")
                 console.print(f"  → {report_path}")
                 console.print(f"  → {blocks_path}")
+                console.print(f"  → {tables_path}")
                 if not args.skip_normalization:
                     console.print(f"  → {normalized_path}")
                     if not args.skip_chunking:

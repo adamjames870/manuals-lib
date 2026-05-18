@@ -164,6 +164,9 @@ def test_chunk_pages_preserves_extraction_method():
 
 def test_chunk_pages_detects_chunk_type():
     """Test that chunking detects chunk types."""
+    # Make content large enough to force separate chunks
+    content_text = "This is regular content about the product specifications. " * 50
+    
     pages = [
         NormalizedPage(
             source="test.pdf",
@@ -173,7 +176,7 @@ def test_chunk_pages_detects_chunk_type():
         NormalizedPage(
             source="test.pdf",
             page_number=2,
-            text="This is regular content about the product specifications.",
+            text=content_text,
         ),
     ]
     
@@ -182,7 +185,7 @@ def test_chunk_pages_detects_chunk_type():
     assert len(chunks) >= 2
     # First chunk should be detected as TOC
     assert chunks[0].chunk_type == "toc"
-    # Second chunk should be content
+    # At least one chunk should be content
     assert any(c.chunk_type == "content" for c in chunks)
 
 

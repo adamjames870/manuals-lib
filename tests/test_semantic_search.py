@@ -231,13 +231,16 @@ def test_semantic_search_excludes_toc_by_default(tmp_path):
         ],
     }
     
-    chunks_file = tmp_path / "chunks.json"
+    chunks_file = tmp_path / "test.chunks.json"
     with open(chunks_file, "w") as f:
         import json
         json.dump(chunks_data, f)
     
-    index_dir = tmp_path / "index"
-    build_index(chunks_file, index_dir)
+    index_base_dir = tmp_path / "index"
+    build_index(chunks_file, index_base_dir)
+    
+    # build_index creates a subdirectory named after the chunks file stem
+    index_dir = index_base_dir / "test"
     
     # Search should exclude TOC by default
     results = semantic_search("technical specifications", index_dir, top_k=5)
@@ -282,13 +285,16 @@ def test_semantic_search_include_all_types(tmp_path):
         ],
     }
     
-    chunks_file = tmp_path / "chunks.json"
+    chunks_file = tmp_path / "test.chunks.json"
     with open(chunks_file, "w") as f:
         import json
         json.dump(chunks_data, f)
     
-    index_dir = tmp_path / "index"
-    build_index(chunks_file, index_dir)
+    index_base_dir = tmp_path / "index"
+    build_index(chunks_file, index_base_dir)
+    
+    # build_index creates a subdirectory named after the chunks file stem
+    index_dir = index_base_dir / "test"
     
     # Search with no exclusions
     results = semantic_search(

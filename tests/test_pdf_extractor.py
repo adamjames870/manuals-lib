@@ -100,12 +100,12 @@ def test_extract_pdf_with_path_object():
 
 def test_extract_pdf_preserves_ocr_metadata():
     """Test that OCR metadata is preserved in PageContent."""
-    from unittest.mock import Mock, patch
+    from unittest.mock import MagicMock, patch
     
     # Mock a PDF with low text content that triggers OCR
     with patch("manuals_lib.ingest.pdf_extractor.pymupdf.open") as mock_open:
-        mock_doc = Mock()
-        mock_page = Mock()
+        mock_doc = MagicMock()
+        mock_page = MagicMock()
         mock_page.get_text.return_value = "A"  # Very short text
         mock_doc.__enter__.return_value = mock_doc
         mock_doc.__exit__.return_value = None
