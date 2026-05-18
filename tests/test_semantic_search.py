@@ -1,7 +1,6 @@
 """Tests for semantic search functionality."""
 
 import json
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -11,7 +10,6 @@ from manuals_lib.embeddings.embedder import (
     load_index,
     semantic_search,
 )
-from manuals_lib.embeddings.models import ChunkMetadata, IndexManifest
 
 
 def test_cosine_similarity_matrix_identical():
