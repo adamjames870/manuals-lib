@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from manuals_lib.ingest import extract_pdf
+from manuals_lib.ingest import extract_pdf, extract_pdf_tables
 from manuals_lib.ingest.models import PageContent
 
 
