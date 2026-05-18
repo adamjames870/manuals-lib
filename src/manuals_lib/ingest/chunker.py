@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from manuals_lib.ingest.models import Chunk, TableData
 from manuals_lib.ingest.normalizer import NormalizedPage
+from manuals_lib.ingest.section_utils import infer_section_context
 from manuals_lib.ingest.table_utils import detect_chunk_type, flatten_table_row
 
 
@@ -96,6 +97,7 @@ def chunk_pages(
             if current_size > 0 and current_size + para_len + 2 > config.max_size:
                 # Finalize current chunk
                 chunk_text = '\n\n'.join(current_text)
+                section_title, section_path = infer_section_context(chunk_text)
                 chunks.append(
                     Chunk(
                         chunk_id=create_chunk_id(source, chunk_index),
@@ -106,6 +108,8 @@ def chunk_pages(
                         char_count=len(chunk_text),
                         chunk_type=detect_chunk_type(chunk_text),
                         extraction_method=current_extraction_method,
+                        section_title=section_title,
+                        section_path=section_path,
                     )
                 )
                 
@@ -135,6 +139,7 @@ def chunk_pages(
             if current_size >= config.target_size:
                 # Finalize current chunk
                 chunk_text = '\n\n'.join(current_text)
+                section_title, section_path = infer_section_context(chunk_text)
                 chunks.append(
                     Chunk(
                         chunk_id=create_chunk_id(source, chunk_index),
@@ -145,6 +150,8 @@ def chunk_pages(
                         char_count=len(chunk_text),
                         chunk_type=detect_chunk_type(chunk_text),
                         extraction_method=current_extraction_method,
+                        section_title=section_title,
+                        section_path=section_path,
                     )
                 )
                 
@@ -168,6 +175,7 @@ def chunk_pages(
     # Finalize any remaining text
     if current_text:
         chunk_text = '\n\n'.join(current_text)
+        section_title, section_path = infer_section_context(chunk_text)
         chunks.append(
             Chunk(
                 chunk_id=create_chunk_id(source, chunk_index),
@@ -178,6 +186,8 @@ def chunk_pages(
                 char_count=len(chunk_text),
                 chunk_type=detect_chunk_type(chunk_text),
                 extraction_method=current_extraction_method,
+                section_title=section_title,
+                section_path=section_path,
             )
         )
     
@@ -212,8 +222,15 @@ def chunk_tables(tables: list[TableData]) -> list[Chunk]:
             if not any(cell.strip() for cell in row):
                 continue
             
+            # Build section context for table
+            section_context = None
+            section_path = None
+            if table_title:
+                section_context = table_title
+                section_path = [table_title]
+            
             # Flatten row to text
-            row_text = flatten_table_row(row, table.headers, table_title)
+            row_text = flatten_table_row(row, table.headers, table_title, section_context)
             
             if not row_text:
                 continue
@@ -231,7 +248,8 @@ def chunk_tables(tables: list[TableData]) -> list[Chunk]:
                     chunk_type="table_row",
                     extraction_method=table.extraction_method,
                     table_id=table.table_id,
-                    section_title=table_title,  # Store table title as section_title
+                    section_title=table_title,
+                    section_path=section_path,
                 )
             )
     

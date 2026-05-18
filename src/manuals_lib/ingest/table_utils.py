@@ -7,6 +7,7 @@ def flatten_table_row(
     row: list[str],
     headers: list[str] | None = None,
     table_title: str | None = None,
+    section_context: str | None = None,
 ) -> str:
     """Flatten a table row into readable labeled text.
     
@@ -14,11 +15,15 @@ def flatten_table_row(
         row: List of cell values
         headers: Optional column headers
         table_title: Optional table title/description
+        section_context: Optional section context for the table
         
     Returns:
         Flattened text representation suitable for embeddings
     """
     parts = []
+    
+    if section_context:
+        parts.append(f"Section: {section_context}.")
     
     if table_title:
         parts.append(f"Table: {table_title}.")

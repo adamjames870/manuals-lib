@@ -133,6 +133,7 @@ def build_index(
                 extraction_method=chunk.get("extraction_method", "pymupdf"),
                 table_id=chunk.get("table_id"),
                 section_title=chunk.get("section_title"),
+                section_path=chunk.get("section_path"),
             )
         )
         texts.append(chunk.get("text", ""))
@@ -168,6 +169,7 @@ def build_index(
                 "extraction_method": cm.extraction_method,
                 "table_id": cm.table_id,
                 "section_title": cm.section_title,
+                "section_path": cm.section_path,
             }
             for cm in chunk_metadata
         ]
@@ -279,6 +281,7 @@ def load_index(index_dir: Path) -> tuple[IndexManifest, list[ChunkMetadata], np.
             extraction_method=chunk.get("extraction_method", "pymupdf"),
             table_id=chunk.get("table_id"),
             section_title=chunk.get("section_title"),
+            section_path=chunk.get("section_path"),
         )
         for chunk in chunks_data["chunks"]
     ]

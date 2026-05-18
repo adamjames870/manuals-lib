@@ -96,6 +96,7 @@ class Chunk:
         extraction_method: Method used to extract source text
         table_id: Reference to source table if chunk_type is table/table_row
         section_title: Section heading if available
+        section_path: Hierarchical path of section titles (e.g., ["Chapter 1", "Section 1.1"])
     """
     chunk_id: str
     source: str
@@ -107,3 +108,4 @@ class Chunk:
     extraction_method: str = "pymupdf"
     table_id: str | None = None
     section_title: str | None = None
+    section_path: list[str] | None = None

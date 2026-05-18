@@ -441,6 +441,7 @@ def extract_to_json(
                         "extraction_method": chunk.extraction_method,
                         "table_id": chunk.table_id,
                         "section_title": chunk.section_title,
+                        "section_path": chunk.section_path,
                     }
                     for chunk in chunks
                 ],

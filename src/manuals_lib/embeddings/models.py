@@ -19,6 +19,7 @@ class ChunkMetadata:
         extraction_method: Method used to extract source text
         table_id: Reference to source table if applicable
         section_title: Section heading if available
+        section_path: Hierarchical path of section titles
     """
     row_index: int
     chunk_id: str
@@ -30,6 +31,7 @@ class ChunkMetadata:
     extraction_method: str = "pymupdf"
     table_id: str | None = None
     section_title: str | None = None
+    section_path: list[str] | None = None
 
 
 @dataclass
