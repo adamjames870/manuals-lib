@@ -30,7 +30,7 @@ def is_heading_line(line: str) -> bool:
     
     # Check for numbered/lettered heading patterns
     # Examples: "1. Introduction", "1.1 Overview", "A. Section Title"
-    if re.match(r'^(\d+\.)+\s+[A-Z]', stripped):  # 1.1 Title
+    if re.match(r'^(\d+\.)+\d*\s+[A-Z]', stripped):  # 1.1 Title or 1.1.1 Title
         return True
     if re.match(r'^(\d+|[A-Z])[\.\)]\s+[A-Z]', stripped):  # 1. Title or A. Title
         return True
@@ -89,7 +89,9 @@ def extract_heading_level(line: str) -> int:
     return 2
 
 
-def infer_section_context(text: str, max_lookback: int = 500) -> tuple[str | None, list[str] | None]:
+def infer_section_context(
+    text: str, max_lookback: int = 500
+) -> tuple[str | None, list[str] | None]:
     """Infer section context from text by looking for nearby headings.
     
     Args:
@@ -118,19 +120,18 @@ def infer_section_context(text: str, max_lookback: int = 500) -> tuple[str | Non
     
     # Build hierarchical path
     section_path = []
-    current_level = 0
     
     for level, heading in headings:
-        # If this is a higher-level heading, reset path
-        if level <= current_level:
-            # Remove headings at same or lower level
-            section_path = [h for l, h in section_path if l < level]
+        # Remove headings at same or deeper level
+        section_path = [
+            (lvl, hdg) for lvl, hdg in section_path if lvl < level
+        ]
         
+        # Add this heading
         section_path.append((level, heading))
-        current_level = level
     
     # Extract just the heading text
-    path_text = [h for _, h in section_path]
+    path_text = [hdg for _, hdg in section_path]
     section_title = path_text[-1] if path_text else None
     
     return section_title, path_text if path_text else None

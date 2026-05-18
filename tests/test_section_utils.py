@@ -34,7 +34,9 @@ def test_is_heading_line_not_heading():
     assert not is_heading_line("This is a regular sentence.")
     assert not is_heading_line("• Bullet point item")
     assert not is_heading_line("- Another bullet")
-    assert not is_heading_line("This is a very long line that exceeds the character limit for headings.")
+    assert not is_heading_line(
+        "This is a very long line that exceeds the character limit for headings."
+    )
 
 
 def test_extract_heading_level():
