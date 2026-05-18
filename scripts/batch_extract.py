@@ -385,6 +385,7 @@ def extract_to_json(
                 "headers": table.headers,
                 "row_count": len(table.rows),
                 "rows": table.rows,
+                "table_title": table.table_title,
             }
             for table in tables
         ],

@@ -69,6 +69,7 @@ class TableData:
         extraction_method: Method used to extract table
         headers: Inferred column headers (optional)
         rows: List of rows, each row is a list of cell values
+        table_title: Inferred table title from nearby text (optional)
     """
     table_id: str
     source: str
@@ -77,6 +78,7 @@ class TableData:
     extraction_method: str
     headers: list[str] | None
     rows: list[list[str]]
+    table_title: str | None = None
 
 
 @dataclass

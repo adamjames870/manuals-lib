@@ -247,6 +247,33 @@ def test_chunk_tables_with_title():
     assert "Table: Technical Specifications" in chunks[0].text
 
 
+def test_chunk_tables_with_metadata_title():
+    """Test chunking tables with title from metadata."""
+    from manuals_lib.ingest.chunker import chunk_tables
+    from manuals_lib.ingest.models import TableData
+    
+    table = TableData(
+        table_id="test_table_4",
+        source="test.pdf",
+        page_number=20,
+        bbox=None,
+        extraction_method="pymupdf_find_tables",
+        headers=["Parameter", "Value"],
+        rows=[
+            ["Speed", "100 km/h"],
+            ["Range", "500 km"],
+        ],
+        table_title="Performance Metrics",
+    )
+    
+    chunks = chunk_tables([table])
+    
+    assert len(chunks) == 2
+    assert "Table: Performance Metrics" in chunks[0].text
+    assert chunks[0].section_title == "Performance Metrics"
+    assert chunks[1].section_title == "Performance Metrics"
+
+
 def test_chunk_tables_skips_empty_rows():
     """Test that empty table rows are skipped."""
     from manuals_lib.ingest.chunker import chunk_tables

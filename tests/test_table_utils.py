@@ -117,3 +117,62 @@ def test_is_front_matter_or_toc():
     assert is_front_matter_or_toc("index") is True
     assert is_front_matter_or_toc("content") is False
     assert is_front_matter_or_toc("table_row") is False
+
+
+def test_infer_table_title_from_text():
+    """Test inferring table title from page text."""
+    from manuals_lib.ingest.pdf_extractor import infer_table_title_from_text
+    
+    # Test explicit "Table N: Title" pattern
+    text = "Some text\nTable 1: Technical Specifications\nMore text"
+    title = infer_table_title_from_text(text, None)
+    assert title == "Technical Specifications"
+    
+    # Test "Table N. Title" pattern
+    text = "Table 2. Performance Metrics\nData follows"
+    title = infer_table_title_from_text(text, None)
+    assert title == "Performance Metrics"
+    
+    # Test "Table: Title" pattern (no number)
+    text = "Table: Engine Parameters\nRow data"
+    title = infer_table_title_from_text(text, None)
+    assert title == "Engine Parameters"
+
+
+def test_infer_table_title_short_caption():
+    """Test inferring table title from short caption lines."""
+    from manuals_lib.ingest.pdf_extractor import infer_table_title_from_text
+    
+    # Short caption-like line
+    text = "Some paragraph text.\nTechnical Specifications\nTable data here"
+    title = infer_table_title_from_text(text, None)
+    assert title == "Technical Specifications"
+
+
+def test_infer_table_title_no_match():
+    """Test that no title is inferred when none is present."""
+    from manuals_lib.ingest.pdf_extractor import infer_table_title_from_text
+    
+    # Regular paragraph text, no table caption
+    text = "This is a regular paragraph. It has multiple sentences."
+    title = infer_table_title_from_text(text, None)
+    assert title is None
+    
+    # Empty text
+    title = infer_table_title_from_text("", None)
+    assert title is None
+
+
+def test_infer_table_title_case_insensitive():
+    """Test that table title inference is case-insensitive."""
+    from manuals_lib.ingest.pdf_extractor import infer_table_title_from_text
+    
+    # Lowercase "table"
+    text = "table 1: Lower Case Title"
+    title = infer_table_title_from_text(text, None)
+    assert title == "Lower Case Title"
+    
+    # Mixed case
+    text = "TaBLe 2: Mixed Case Title"
+    title = infer_table_title_from_text(text, None)
+    assert title == "Mixed Case Title"

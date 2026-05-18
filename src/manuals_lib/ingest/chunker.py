@@ -196,14 +196,15 @@ def chunk_tables(tables: list[TableData]) -> list[Chunk]:
     chunks = []
     
     for table in tables:
-        # Determine table title from first row if it looks like a title
-        table_title = None
+        # Use table_title from metadata if available, otherwise check first row
+        table_title = table.table_title
         data_rows = table.rows
         
-        # If first row has only one non-empty cell, treat it as title
-        if data_rows and len([cell for cell in data_rows[0] if cell.strip()]) == 1:
-            table_title = next((cell for cell in data_rows[0] if cell.strip()), None)
-            data_rows = data_rows[1:]
+        # If no title in metadata and first row has only one non-empty cell, treat it as title
+        if not table_title and data_rows:
+            if len([cell for cell in data_rows[0] if cell.strip()]) == 1:
+                table_title = next((cell for cell in data_rows[0] if cell.strip()), None)
+                data_rows = data_rows[1:]
         
         # Create a chunk for each row
         for row_idx, row in enumerate(data_rows):
@@ -230,6 +231,7 @@ def chunk_tables(tables: list[TableData]) -> list[Chunk]:
                     chunk_type="table_row",
                     extraction_method=table.extraction_method,
                     table_id=table.table_id,
+                    section_title=table_title,  # Store table title as section_title
                 )
             )
     

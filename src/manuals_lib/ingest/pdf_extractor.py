@@ -1,6 +1,7 @@
 """PDF text extraction functionality."""
 
 import logging
+import re
 from pathlib import Path
 
 import pymupdf
@@ -9,6 +10,63 @@ from manuals_lib.ingest.models import BoundingBox, PageContent, TableData, TextB
 from manuals_lib.ingest.ocr_extractor import extract_text_with_ocr, should_use_ocr
 
 logger = logging.getLogger(__name__)
+
+
+def infer_table_title_from_text(page_text: str, table_bbox: BoundingBox | None) -> str | None:
+    """Infer a table title from nearby text on the page.
+    
+    Looks for:
+    - Lines starting with "Table N:" or "Table N."
+    - Short lines (< 100 chars) that look like captions
+    - Lines containing keywords like "Table", followed by a colon or period
+    
+    Args:
+        page_text: Full text content of the page
+        table_bbox: Bounding box of the table (optional, for future spatial analysis)
+        
+    Returns:
+        Inferred table title or None
+    """
+    if not page_text:
+        return None
+    
+    lines = page_text.split('\n')
+    
+    # Look for explicit table captions
+    for line in lines:
+        line_stripped = line.strip()
+        
+        # Pattern: "Table N: Title" or "Table N. Title"
+        match = re.match(r'^Table\s+\d+[\.:]\s+(.+)', line_stripped, re.IGNORECASE)
+        if match:
+            title = match.group(1).strip()
+            if title and len(title) < 200:  # Reasonable title length
+                return title
+        
+        # Pattern: "Table: Title" (without number)
+        match = re.match(r'^Table[\.:]\s+(.+)', line_stripped, re.IGNORECASE)
+        if match:
+            title = match.group(1).strip()
+            if title and len(title) < 200:
+                return title
+    
+    # Look for short lines that might be captions
+    # These are typically < 100 chars and look like headings
+    for line in lines:
+        line_stripped = line.strip()
+        if (
+            line_stripped
+            and 10 < len(line_stripped) < 100
+            and not line_stripped.endswith(('.', '!', '?'))
+            and not line_stripped.startswith(('-', '•', '*', '○'))  # Not a bullet
+            and line_stripped[0].isupper()  # Starts with capital
+        ):
+            # Avoid lines that look like regular sentences
+            word_count = len(line_stripped.split())
+            if word_count <= 10:  # Short enough to be a caption
+                return line_stripped
+    
+    return None
 
 
 def extract_pdf(pdf_path: str | Path, use_ocr_fallback: bool = True) -> list[PageContent]:
@@ -142,6 +200,10 @@ def extract_pdf_tables(pdf_path: str | Path) -> list[TableData]:
                         if all(first_row):
                             headers = first_row
                     
+                    # Try to infer table title from page text
+                    page_text = page.get_text()
+                    table_title = infer_table_title_from_text(page_text, bbox)
+                    
                     tables.append(
                         TableData(
                             table_id=table_id,
@@ -151,6 +213,7 @@ def extract_pdf_tables(pdf_path: str | Path) -> list[TableData]:
                             extraction_method="pymupdf_find_tables",
                             headers=headers,
                             rows=[[str(cell) if cell else "" for cell in row] for row in rows],
+                            table_title=table_title,
                         )
                     )
                     
