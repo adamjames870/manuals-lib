@@ -103,26 +103,27 @@ def test_extract_pdf_preserves_ocr_metadata():
     from unittest.mock import MagicMock, patch
     
     # Mock a PDF with low text content that triggers OCR
-    with patch("manuals_lib.ingest.pdf_extractor.pymupdf.open") as mock_open:
-        mock_doc = MagicMock()
-        mock_page = MagicMock()
-        mock_page.get_text.return_value = "A"  # Very short text
-        mock_doc.__enter__.return_value = mock_doc
-        mock_doc.__exit__.return_value = None
-        mock_doc.__iter__.return_value = iter([mock_page])
-        mock_open.return_value = mock_doc
-        
-        # Mock OCR to return text
-        with patch("manuals_lib.ingest.pdf_extractor.extract_text_with_ocr") as mock_ocr:
-            mock_ocr.return_value = "OCR extracted text content"
+    with patch("manuals_lib.ingest.pdf_extractor.Path.exists", return_value=True):
+        with patch("manuals_lib.ingest.pdf_extractor.pymupdf.open") as mock_open:
+            mock_doc = MagicMock()
+            mock_page = MagicMock()
+            mock_page.get_text.return_value = "A"  # Very short text
+            mock_doc.__enter__.return_value = mock_doc
+            mock_doc.__exit__.return_value = None
+            mock_doc.__iter__.return_value = iter([mock_page])
+            mock_open.return_value = mock_doc
             
-            pages = extract_pdf("test.pdf", use_ocr_fallback=True)
-            
-            assert len(pages) == 1
-            assert pages[0].extraction_method == "ocr"
-            assert pages[0].ocr_engine == "tesseract"
-            assert pages[0].ocr_trigger_reason is not None
-            assert "low_text_content" in pages[0].ocr_trigger_reason
+            # Mock OCR to return text
+            with patch("manuals_lib.ingest.pdf_extractor.extract_text_with_ocr") as mock_ocr:
+                mock_ocr.return_value = "OCR extracted text content"
+                
+                pages = extract_pdf("test.pdf", use_ocr_fallback=True)
+                
+                assert len(pages) == 1
+                assert pages[0].extraction_method == "ocr"
+                assert pages[0].ocr_engine == "tesseract"
+                assert pages[0].ocr_trigger_reason is not None
+                assert "low_text_content" in pages[0].ocr_trigger_reason
 
 
 def test_extract_pdf_tables():
