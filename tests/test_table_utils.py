@@ -1,8 +1,6 @@
 """Tests for table processing utilities."""
 
-import pytest
 
-from manuals_lib.ingest.models import BoundingBox, TableData
 from manuals_lib.ingest.table_utils import (
     detect_chunk_type,
     flatten_table_row,
