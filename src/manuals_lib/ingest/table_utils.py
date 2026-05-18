@@ -2,8 +2,6 @@
 
 import re
 
-from manuals_lib.ingest.models import TableData
-
 
 def flatten_table_row(
     row: list[str],
