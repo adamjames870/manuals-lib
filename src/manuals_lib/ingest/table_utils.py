@@ -83,7 +83,7 @@ def detect_chunk_type(text: str) -> str:
             short_lines_with_numbers += 1
     
     # If many lines have TOC-like patterns, classify as TOC
-    total_lines = len([l for l in lines if l.strip()])
+    total_lines = len([line for line in lines if line.strip()])
     if total_lines > 0:
         toc_ratio = (short_lines_with_numbers + dotted_leader_lines) / total_lines
         if toc_ratio > 0.5:

@@ -270,7 +270,10 @@ def main():
         
         # Rank and score
         score_color = "green" if similarity > 0.7 else "yellow" if similarity > 0.5 else "white"
-        table.add_row("Rank:", f"[bold]{rank}[/bold] | Score: [{score_color}]{similarity:.4f}[/{score_color}]")
+        table.add_row(
+            "Rank:",
+            f"[bold]{rank}[/bold] | Score: [{score_color}]{similarity:.4f}[/{score_color}]"
+        )
         
         # Source info
         type_label = f" [{chunk.chunk_type}]" if chunk.chunk_type != "content" else ""

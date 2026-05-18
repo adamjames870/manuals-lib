@@ -198,7 +198,10 @@ def generate_report(
         report += "|----------|------|------|-------------|\n"
         for table in tables:
             has_headers = "Yes" if table.headers else "No"
-            report += f"| {table.table_id} | {table.page_number} | {len(table.rows)} | {has_headers} |\n"
+            report += (
+                f"| {table.table_id} | {table.page_number} | "
+                f"{len(table.rows)} | {has_headers} |\n"
+            )
     
     # Add chunk statistics if available
     if chunks:
